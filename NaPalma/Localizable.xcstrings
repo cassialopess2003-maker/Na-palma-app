@@ -1,0 +1,1426 @@
+{
+  "sourceLanguage": "en",
+  "strings": {
+    "%@ (%@) is due on day %lld.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ (%@) vence no dia %lld."
+          }
+        }
+      }
+    },
+    "%@ left": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restam %@"
+          }
+        }
+      }
+    },
+    "%@ of %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ de %@"
+          }
+        }
+      }
+    },
+    "%@ over budget": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ acima do orçamento"
+          }
+        }
+      }
+    },
+    "%@ used": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "%@ usado"
+          }
+        }
+      }
+    },
+    "1 day before": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 dia antes"
+          }
+        }
+      }
+    },
+    "1 week before": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "1 semana antes"
+          }
+        }
+      }
+    },
+    "3 days before": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "3 dias antes"
+          }
+        }
+      }
+    },
+    "About": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sobre"
+          }
+        }
+      }
+    },
+    "Action": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ação"
+          }
+        }
+      }
+    },
+    "Active": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ativa"
+          }
+        }
+      }
+    },
+    "Add budget": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adicionar orçamento"
+          }
+        }
+      }
+    },
+    "Add fixed bill": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adicionar conta fixa"
+          }
+        }
+      }
+    },
+    "Add goal": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adicionar meta"
+          }
+        }
+      }
+    },
+    "Add money": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guardar dinheiro"
+          }
+        }
+      }
+    },
+    "Add rent, salary or subscriptions once. They'll be recorded every month and you'll get a reminder before bills are due.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cadastre aluguel, salário ou assinaturas uma vez só. Eles serão lançados todo mês e você recebe um lembrete antes do vencimento."
+          }
+        }
+      }
+    },
+    "Add transaction": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Adicionar lançamento"
+          }
+        }
+      }
+    },
+    "All": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todos"
+          }
+        }
+      }
+    },
+    "Already saved": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Já guardado"
+          }
+        }
+      }
+    },
+    "Amount": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Valor"
+          }
+        }
+      }
+    },
+    "Balance this month": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saldo do mês"
+          }
+        }
+      }
+    },
+    "Bill reminder": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lembrete de conta"
+          }
+        }
+      }
+    },
+    "Bill reminders are on": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lembretes de contas ativados"
+          }
+        }
+      }
+    },
+    "Bills": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contas"
+          }
+        }
+      }
+    },
+    "Budget alerts": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Alertas de orçamento"
+          }
+        }
+      }
+    },
+    "Budgets": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Orçamentos"
+          }
+        }
+      }
+    },
+    "Budgets reset at the beginning of every month.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Os orçamentos reiniciam no começo de cada mês."
+          }
+        }
+      }
+    },
+    "Cancel": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cancelar"
+          }
+        }
+      }
+    },
+    "Category": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Categoria"
+          }
+        }
+      }
+    },
+    "Charts": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Gráficos"
+          }
+        }
+      }
+    },
+    "Confirm to change the app lock": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Confirme para alterar o bloqueio do app"
+          }
+        }
+      }
+    },
+    "Create a goal like a trip or an emergency fund and track your progress.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Crie uma meta, como uma viagem ou uma reserva de emergência, e acompanhe seu progresso."
+          }
+        }
+      }
+    },
+    "Currency": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moeda"
+          }
+        }
+      }
+    },
+    "Date": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Data"
+          }
+        }
+      }
+    },
+    "Day of the month": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Dia do mês"
+          }
+        }
+      }
+    },
+    "Deadline": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Prazo"
+          }
+        }
+      }
+    },
+    "Delete": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apagar"
+          }
+        }
+      }
+    },
+    "Delete this transaction?": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apagar este lançamento?"
+          }
+        }
+      }
+    },
+    "Delete transaction": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Apagar lançamento"
+          }
+        }
+      }
+    },
+    "Description (optional)": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Descrição (opcional)"
+          }
+        }
+      }
+    },
+    "Done": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "OK"
+          }
+        }
+      }
+    },
+    "Each category can have one budget.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Cada categoria pode ter um orçamento."
+          }
+        }
+      }
+    },
+    "Edit budget": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editar orçamento"
+          }
+        }
+      }
+    },
+    "Edit fixed bill": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editar conta fixa"
+          }
+        }
+      }
+    },
+    "Edit goal": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editar meta"
+          }
+        }
+      }
+    },
+    "Edit transaction": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Editar lançamento"
+          }
+        }
+      }
+    },
+    "Education": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Educação"
+          }
+        }
+      }
+    },
+    "Every month on day %lld": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Todo mês no dia %lld"
+          }
+        }
+      }
+    },
+    "Expense": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Despesa"
+          }
+        }
+      }
+    },
+    "Expenses": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Despesas"
+          }
+        }
+      }
+    },
+    "Filter": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Filtro"
+          }
+        }
+      }
+    },
+    "Fixed bills": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contas fixas"
+          }
+        }
+      }
+    },
+    "Fixed expenses per month: %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Despesas fixas por mês: %@"
+          }
+        }
+      }
+    },
+    "Freelance": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Freelance"
+          }
+        }
+      }
+    },
+    "Gifts": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Presentes"
+          }
+        }
+      }
+    },
+    "Go to current month": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ir para o mês atual"
+          }
+        }
+      }
+    },
+    "Goal name (e.g. Trip)": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nome da meta (ex.: Viagem)"
+          }
+        }
+      }
+    },
+    "Goal reached! 🎉": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Meta alcançada! 🎉"
+          }
+        }
+      }
+    },
+    "Goals": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Metas"
+          }
+        }
+      }
+    },
+    "Groceries": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mercado"
+          }
+        }
+      }
+    },
+    "Health": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Saúde"
+          }
+        }
+      }
+    },
+    "Home": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Início"
+          }
+        }
+      }
+    },
+    "Housing": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Moradia"
+          }
+        }
+      }
+    },
+    "Icon": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ícone"
+          }
+        }
+      }
+    },
+    "If you denied notifications before, turn them on in the iPhone Settings app.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Se você recusou as notificações antes, ative-as no app Ajustes do iPhone."
+          }
+        }
+      }
+    },
+    "Income": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Receita"
+          }
+        }
+      }
+    },
+    "Investments": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Investimentos"
+          }
+        }
+      }
+    },
+    "Language and currency follow your iPhone settings.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O idioma e a moeda seguem os ajustes do seu iPhone."
+          }
+        }
+      }
+    },
+    "Last 6 months": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Últimos 6 meses"
+          }
+        }
+      }
+    },
+    "Leisure": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lazer"
+          }
+        }
+      }
+    },
+    "Lock with %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Bloquear com %@"
+          }
+        }
+      }
+    },
+    "Month": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mês"
+          }
+        }
+      }
+    },
+    "Monthly limit": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Limite mensal"
+          }
+        }
+      }
+    },
+    "Na Palma": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Na Palma"
+          }
+        }
+      }
+    },
+    "Na Palma is locked": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O Na Palma está bloqueado"
+          }
+        }
+      }
+    },
+    "Name (e.g. Rent, Netflix)": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nome (ex.: Aluguel, Netflix)"
+          }
+        }
+      }
+    },
+    "New budget": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Novo orçamento"
+          }
+        }
+      }
+    },
+    "New fixed bill": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nova conta fixa"
+          }
+        }
+      }
+    },
+    "New goal": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nova meta"
+          }
+        }
+      }
+    },
+    "New transaction": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Novo lançamento"
+          }
+        }
+      }
+    },
+    "Next month": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Próximo mês"
+          }
+        }
+      }
+    },
+    "No budgets yet": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhum orçamento ainda"
+          }
+        }
+      }
+    },
+    "No data this month": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sem dados neste mês"
+          }
+        }
+      }
+    },
+    "No fixed bills yet": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhuma conta fixa ainda"
+          }
+        }
+      }
+    },
+    "No goals yet": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhuma meta ainda"
+          }
+        }
+      }
+    },
+    "No results": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhum resultado"
+          }
+        }
+      }
+    },
+    "No transactions": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhum lançamento"
+          }
+        }
+      }
+    },
+    "No transactions this month": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Nenhum lançamento neste mês"
+          }
+        }
+      }
+    },
+    "Note": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Observação"
+          }
+        }
+      }
+    },
+    "Notifications": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Notificações"
+          }
+        }
+      }
+    },
+    "On the due day": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "No dia do vencimento"
+          }
+        }
+      }
+    },
+    "Other": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Outros"
+          }
+        }
+      }
+    },
+    "Other income": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Outras receitas"
+          }
+        }
+      }
+    },
+    "Over budget": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Estourou"
+          }
+        }
+      }
+    },
+    "Passcode": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Código"
+          }
+        }
+      }
+    },
+    "Pets": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Pets"
+          }
+        }
+      }
+    },
+    "Planning": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Planejar"
+          }
+        }
+      }
+    },
+    "Previous month": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Mês anterior"
+          }
+        }
+      }
+    },
+    "Recent transactions": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Últimos lançamentos"
+          }
+        }
+      }
+    },
+    "Remind me": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Lembrar-me"
+          }
+        }
+      }
+    },
+    "Restaurants": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Restaurantes"
+          }
+        }
+      }
+    },
+    "Salary": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salário"
+          }
+        }
+      }
+    },
+    "Save": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Salvar"
+          }
+        }
+      }
+    },
+    "Saved so far: %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Guardado até agora: %@"
+          }
+        }
+      }
+    },
+    "Search transactions": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Buscar lançamentos"
+          }
+        }
+      }
+    },
+    "Section": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seção"
+          }
+        }
+      }
+    },
+    "Security": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Segurança"
+          }
+        }
+      }
+    },
+    "Set a deadline": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Definir prazo"
+          }
+        }
+      }
+    },
+    "Set a monthly limit for a category and we'll warn you when you get close.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Defina um limite mensal para uma categoria e avisaremos quando você estiver perto dele."
+          }
+        }
+      }
+    },
+    "Set up a passcode on your iPhone to use this option.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Configure um código no seu iPhone para usar esta opção."
+          }
+        }
+      }
+    },
+    "Settings": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ajustes"
+          }
+        }
+      }
+    },
+    "Shopping": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Compras"
+          }
+        }
+      }
+    },
+    "Sign in to iCloud in the iPhone Settings app to back up and sync your data. Meanwhile, everything is saved on this iPhone.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Entre no iCloud pelo app Ajustes do iPhone para fazer backup e sincronizar seus dados. Enquanto isso, tudo fica salvo neste iPhone."
+          }
+        }
+      }
+    },
+    "Starts on": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Começa em"
+          }
+        }
+      }
+    },
+    "Subscriptions": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Assinaturas"
+          }
+        }
+      }
+    },
+    "Syncing with iCloud": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Sincronizando com o iCloud"
+          }
+        }
+      }
+    },
+    "Tap + to add your first transaction.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toque em + para adicionar seu primeiro lançamento."
+          }
+        }
+      }
+    },
+    "Tap Expense or Income to add your first one.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Toque em Despesa ou Receita para adicionar o primeiro."
+          }
+        }
+      }
+    },
+    "Target": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Objetivo"
+          }
+        }
+      }
+    },
+    "The app asks for authentication every time it's opened.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O app pede autenticação sempre que for aberto."
+          }
+        }
+      }
+    },
+    "The transaction is recorded automatically on this day every month.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "O lançamento é registrado automaticamente nesse dia, todo mês."
+          }
+        }
+      }
+    },
+    "Total": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Total"
+          }
+        }
+      }
+    },
+    "Transactions": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Extrato"
+          }
+        }
+      }
+    },
+    "Transport": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Transporte"
+          }
+        }
+      }
+    },
+    "Travel": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Viagens"
+          }
+        }
+      }
+    },
+    "Try searching for another word.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tente buscar outra palavra."
+          }
+        }
+      }
+    },
+    "Turn on bill reminders": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Ativar lembretes de contas"
+          }
+        }
+      }
+    },
+    "Type": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Tipo"
+          }
+        }
+      }
+    },
+    "Unlock": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desbloquear"
+          }
+        }
+      }
+    },
+    "Unlock to see your finances": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Desbloqueie para ver suas finanças"
+          }
+        }
+      }
+    },
+    "Until %@": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Até %@"
+          }
+        }
+      }
+    },
+    "Upcoming bills": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Contas próximas"
+          }
+        }
+      }
+    },
+    "Version": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Versão"
+          }
+        }
+      }
+    },
+    "When": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Quando"
+          }
+        }
+      }
+    },
+    "Withdraw": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Retirar"
+          }
+        }
+      }
+    },
+    "You'll get a notification at 9:00.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Você receberá uma notificação às 9:00."
+          }
+        }
+      }
+    },
+    "Your categories will show up here.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Suas categorias aparecerão aqui."
+          }
+        }
+      }
+    },
+    "Your data is kept private in your iCloud account and syncs between your devices.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seus dados ficam privados na sua conta do iCloud e sincronizam entre seus aparelhos."
+          }
+        }
+      }
+    },
+    "Your financial data is protected.": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "Seus dados financeiros estão protegidos."
+          }
+        }
+      }
+    },
+    "iCloud": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud"
+          }
+        }
+      }
+    },
+    "iCloud is off": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "iCloud desativado"
+          }
+        }
+      }
+    },
+    "· Paused": {
+      "localizations": {
+        "pt-BR": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "· Pausada"
+          }
+        }
+      }
+    }
+  },
+  "version": "1.0"
+}
