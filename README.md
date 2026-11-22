@@ -53,8 +53,11 @@ NaPalma/
 Config/             Info.plist e entitlements (iCloud, notificações)
 ```
 
-## Versão web (sem Mac)
+## Versão web (sem Mac e sem login)
 
-`web/index.html` é a versão web do app, que funciona no navegador do iPhone. Aberta como arquivo
-ou hospedada em qualquer site estático (Netlify, Cloudflare Pages…), ela salva os dados no próprio
-navegador. Publicada como Artifact no claude.ai, salva os dados na conta Claude de quem usa.
+A pasta `web/` é um site completo que funciona como app no iPhone e no Android:
+instala na tela inicial, funciona sem internet depois da primeira visita e guarda os dados no
+próprio aparelho, com exportação e importação de backup em Ajustes.
+
+Para colocar no ar de graça, arraste a pasta `web/` em https://app.netlify.com/drop
+(ou use Cloudflare Pages / GitHub Pages). Não precisa de servidor nem de banco de dados.

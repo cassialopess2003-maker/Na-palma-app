@@ -3,7 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Controle financeiro simples: despesas, receitas, orçamentos, metas e contas fixas.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>:root{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui}img{max-width:100%}[hidden]{display:none!important}</style>
 </head>
 <body>
@@ -233,12 +239,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
   <div class="intro">
     <span class="tag">Controle financeiro</span>
     <h1>Na Palma</h1>
-    <p>Lance despesas e receitas, acompanhe o saldo do mês, defina orçamentos e metas e cadastre suas contas fixas.</p>
-    <p>Seus dados ficam salvos na sua conta, visíveis só para você. Abra este mesmo link no iPhone para usar no celular.</p>
+    <p>Lance despesas e receitas, acompanhe o saldo do mês, defina orçamentos e metas e cadastre suas contas fixas. Sem cadastro e sem login.</p>
+    <p>Abra este endereço no celular e instale como app:</p>
     <ul>
-      <li>No iPhone, toque em <b>Compartilhar</b> e depois em <b>Adicionar à Tela de Início</b></li>
-      <li>Em <b>Ajustes</b>, ative a senha de bloqueio</li>
+      <li>iPhone (Safari): <b>Compartilhar</b> → <b>Adicionar à Tela de Início</b></li>
+      <li>Android (Chrome): menu <b>⋮</b> → <b>Instalar app</b> ou <b>Adicionar à tela inicial</b></li>
     </ul>
+    <p>Seus dados ficam guardados só no aparelho. Em Ajustes você exporta um backup.</p>
   </div>
 
   <div class="phone" id="phone">
@@ -256,6 +263,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 
 <script>
 (() => {
+const STANDALONE = !window.claude;
 /* ---------- Formatting ---------- */
 const REGION_CURRENCY = { BR: 'BRL', US: 'USD', PT: 'EUR', ES: 'EUR', FR: 'EUR', DE: 'EUR', IT: 'EUR', IE: 'EUR', NL: 'EUR', GB: 'GBP', AR: 'ARS', MX: 'MXN', CL: 'CLP', CO: 'COP', UY: 'UYU', PY: 'PYG', CA: 'CAD', AU: 'AUD', JP: 'JPY', AO: 'AOA', MZ: 'MZN' };
 const region = ((navigator.language || 'pt-BR').split('-')[1] || 'BR').toUpperCase();
@@ -525,6 +533,8 @@ function settings() {
   <div class="foot">${mode === 'db' ? 'Só você vê seus dados, mesmo que compartilhe este link. Eles aparecem em qualquer aparelho em que você abrir o app com a sua conta.' : 'Os dados ficam guardados apenas neste navegador.'}</div>
   <div class="group-h"><span>Sobre</span></div><div class="list">${item('#8E8E93', '💱', 'Moeda', `<span class="val">${CURRENCY}</span>`)}<div class="divider" style="margin-left:42px"></div>${item('#8E8E93', 'ℹ️', 'Versão', '<span class="val">1.0 (web)</span>')}</div>
   <div class="foot">A moeda segue a região do seu aparelho.</div>
+  ${STANDALONE ? `<div class="group-h"><span>Backup</span></div><div class="list"><button class="linkbtn" data-act="export">Exportar backup</button><div class="divider" style="margin-left:0"></div><label class="linkbtn" for="importFile" style="cursor:pointer">Importar backup</label><input type="file" id="importFile" accept="application/json,.json" hidden></div>
+  <div class="foot">Os dados ficam só neste aparelho. Exporte um backup de vez em quando para não perder nada se limpar o navegador ou trocar de celular. O backup também serve para passar seus dados para outro aparelho.</div>` : ''}
   <button class="danger" data-act="wipe">Apagar todos os dados</button></div>`;
 }
 
@@ -746,6 +756,11 @@ document.addEventListener('click', async ev => {
     case 'pin':
       if (lsGet(LS_PIN)) { lsSet(LS_PIN, null); render(); toast('Bloqueio desativado'); } else showKeypad('set');
       break;
+    case 'export': {
+      const blob = new Blob([JSON.stringify({ app: 'napalma', version: 1, exported: new Date().toISOString(), data }, null, 1)], { type: 'application/json' });
+      const a2 = document.createElement('a'); a2.href = URL.createObjectURL(blob); a2.download = `na-palma-backup-${iso(today())}.json`;
+      document.body.appendChild(a2); a2.click(); a2.remove(); setTimeout(() => URL.revokeObjectURL(a2.href), 5000); toast('Backup exportado'); break;
+    }
     case 'key': keyPressed(v); break;
     case 'key-back': pinBuf = pinBuf.slice(0, -1); paintDots(); break;
     case 'key-cancel': $('lock')?.remove(); pinMode = null; break;
@@ -763,7 +778,22 @@ document.addEventListener('input', ev => {
     const s = $('search'); s.focus(); s.setSelectionRange(pos, pos);
   } else if (ev.target.closest('#sheetBody')) checkSave();
 });
-document.addEventListener('change', ev => { if (ev.target.closest('#sheetBody')) checkSave(); });
+document.addEventListener('change', ev => {
+  if (ev.target.id === 'importFile') {
+    const f = ev.target.files && ev.target.files[0]; if (!f) return;
+    f.text().then(txt => {
+      const j = JSON.parse(txt); const src = j && j.data;
+      if (!src || typeof src !== 'object' || !src.entries) throw new Error('bad');
+      let n = 0;
+      KINDS.forEach(k => Object.entries(src[k] || {}).forEach(([id, v]) => { if (v && typeof v === 'object') { data[k][id] = { ...v, id }; n++; } }));
+      saveLocal(); recurrenceDone = false; runRecurrence().then(render); render(); toast(n + ' itens importados');
+    }).catch(() => toast('Esse arquivo não é um backup do Na Palma'));
+    ev.target.value = '';
+    return;
+  }
+  if (ev.target.closest('#sheetBody')) checkSave();
+});
+if (STANDALONE && 'serviceWorker' in navigator && location.protocol.startsWith('http')) navigator.serviceWorker.register('sw.js').catch(() => {});
 
 render();
 if (lsGet(LS_PIN)) showKeypad('unlock');
