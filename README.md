@@ -52,3 +52,9 @@ NaPalma/
 └── Assets.xcassets         ícone e cor do app
 Config/             Info.plist e entitlements (iCloud, notificações)
 ```
+
+## Versão web (sem Mac)
+
+`web/index.html` é a versão web do app, que funciona no navegador do iPhone. Aberta como arquivo
+ou hospedada em qualquer site estático (Netlify, Cloudflare Pages…), ela salva os dados no próprio
+navegador. Publicada como Artifact no claude.ai, salva os dados na conta Claude de quem usa.
