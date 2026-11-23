@@ -233,6 +233,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--accent); ou
 .lock .lk { font-size: 40px; }
 
 .progress { display: block; }
+.install { gap: 12px; }
+.install .steps .step { align-items: flex-start; line-height: 1.4; }
+.install .steps .step b.n { margin-top: 1px; }
+.install .actions { display: flex; gap: 10px; }
+.install .actions .btn { flex: 1; }
+.kbd { display: inline-flex; align-items: center; justify-content: center; min-width: 22px; height: 22px; padding: 0 5px; border-radius: 6px; background: var(--fill); font-weight: 600; font-size: 13px; vertical-align: -1px; }
 </style>
 
 <div class="wrap">
@@ -406,6 +412,36 @@ const header = (title, plus, label) => `<div class="navrow"><div class="large-ti
 const emptyState = (ic, t, s) => `<div class="empty"><div class="big">${ic}</div><b>${t}</b><span>${s}</span></div>`;
 const bannerHtml = () => banner ? `<div class="banner" role="status">${esc(banner)}</div>` : '';
 
+/* ---------- Install tutorial (standalone site only) ---------- */
+const UA = navigator.userAgent || '';
+const IS_IOS = /iPhone|iPad|iPod/.test(UA) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const IS_ANDROID = /Android/i.test(UA);
+const LS_INSTALL = 'napalma-install-hidden';
+let installPrompt = null;
+const isInstalled = () => (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installPrompt = e; render(); });
+window.addEventListener('appinstalled', () => { installPrompt = null; toast('App instalado'); render(); });
+function installCard() {
+  if (!STANDALONE || isInstalled() || lsGet(LS_INSTALL)) return '';
+  const tab = S.installTab || (IS_ANDROID ? 'android' : 'ios');
+  const steps = tab === 'ios' ? [
+    'Abra este site no <b>Safari</b>.',
+    'Toque em <b>Compartilhar</b> <span class="kbd">⬆︎</span> na barra do Safari. Se não aparecer, toque em <span class="kbd">•••</span> e depois em <b>Compartilhar</b>.',
+    'Role a lista e toque em <b>Adicionar à Tela de Início</b>.',
+    'Toque em <b>Adicionar</b>. O ícone do Na Palma aparece junto dos seus apps.',
+  ] : [
+    'Abra este site no <b>Chrome</b>.',
+    'Toque no menu <span class="kbd">⋮</span> no canto de cima.',
+    'Toque em <b>Instalar app</b> ou <b>Adicionar à tela inicial</b>.',
+    'Confirme em <b>Instalar</b>. O ícone do Na Palma aparece junto dos seus apps.',
+  ];
+  return `<div class="card install"><h3>📲 Instale o Na Palma no celular</h3>
+    ${seg('install-tab', [['ios', 'iPhone'], ['android', 'Android']], tab)}
+    <div class="steps">${steps.map((t, i) => `<div class="step"><b class="n">${i + 1}</b><span>${t}</span></div>`).join('')}</div>
+    <div class="actions">${tab === 'android' && installPrompt ? '<button class="btn" data-act="install-now">Instalar agora</button>' : ''}<button class="btn ghost" data-act="install-hide">Agora não</button></div>
+    <div class="s" style="font-size:12.5px;color:var(--muted)">Depois de instalado, o app abre em tela cheia e funciona sem internet. Para ver este tutorial de novo, vá em Ajustes.</div></div>`;
+}
+
 /* ---------- Screens ---------- */
 function home() {
   const list = inMonth(S.month);
@@ -415,7 +451,7 @@ function home() {
   const isNow = sameMonth(S.month, t);
   const recent = list.slice(0, 6);
   const brandNew = !Object.keys(data.entries).length && !Object.keys(data.recurring).length;
-  return `${header('Na Palma', 'add-out', 'Adicionar lançamento')}<div class="stack">${bannerHtml()}${monthSwitch()}
+  return `${header('Na Palma', 'add-out', 'Adicionar lançamento')}<div class="stack">${bannerHtml()}${installCard()}${monthSwitch()}
   <div class="balance"><div><small>Saldo do mês</small><div class="big">${money(bal(list))}</div></div>
     <div class="row"><div class="pill"><span class="arrow" style="color:var(--green)">↑</span><div style="min-width:0"><span>Receitas</span><b>${money(total(list, 'in'))}</b></div></div>
     <div class="pill"><span class="arrow" style="color:var(--red)">↓</span><div style="min-width:0"><span>Despesas</span><b>${money(total(list, 'out'))}</b></div></div></div></div>
@@ -533,6 +569,7 @@ function settings() {
   <div class="foot">${mode === 'db' ? 'Só você vê seus dados, mesmo que compartilhe este link. Eles aparecem em qualquer aparelho em que você abrir o app com a sua conta.' : 'Os dados ficam guardados apenas neste navegador.'}</div>
   <div class="group-h"><span>Sobre</span></div><div class="list">${item('#8E8E93', '💱', 'Moeda', `<span class="val">${CURRENCY}</span>`)}<div class="divider" style="margin-left:42px"></div>${item('#8E8E93', 'ℹ️', 'Versão', '<span class="val">1.0 (web)</span>')}</div>
   <div class="foot">A moeda segue a região do seu aparelho.</div>
+  ${STANDALONE && !isInstalled() ? `<button class="danger" style="color:var(--accent)" data-act="install-show">📲 Como instalar no celular</button>` : ''}
   ${STANDALONE ? `<div class="group-h"><span>Backup</span></div><div class="list"><button class="linkbtn" data-act="export">Exportar backup</button><div class="divider" style="margin-left:0"></div><label class="linkbtn" for="importFile" style="cursor:pointer">Importar backup</label><input type="file" id="importFile" accept="application/json,.json" hidden></div>
   <div class="foot">Os dados ficam só neste aparelho. Exporte um backup de vez em quando para não perder nada se limpar o navegador ou trocar de celular. O backup também serve para passar seus dados para outro aparelho.</div>` : ''}
   <button class="danger" data-act="wipe">Apagar todos os dados</button></div>`;
@@ -755,6 +792,12 @@ document.addEventListener('click', async ev => {
       delArmed = false; { const msg = await S.sheet.cfg.del(S.sheet.F); closeSheet(); render(); toast(msg); } break;
     case 'pin':
       if (lsGet(LS_PIN)) { lsSet(LS_PIN, null); render(); toast('Bloqueio desativado'); } else showKeypad('set');
+      break;
+    case 'install-tab': S.installTab = v; render(); break;
+    case 'install-hide': lsSet(LS_INSTALL, '1'); render(); toast('Você encontra o tutorial em Ajustes'); break;
+    case 'install-show': lsSet(LS_INSTALL, null); S.tab = 'home'; render(); $('screen').scrollTop = 0; break;
+    case 'install-now':
+      if (installPrompt) { installPrompt.prompt(); try { await installPrompt.userChoice; } catch {} installPrompt = null; render(); }
       break;
     case 'export': {
       const blob = new Blob([JSON.stringify({ app: 'napalma', version: 1, exported: new Date().toISOString(), data }, null, 1)], { type: 'application/json' });

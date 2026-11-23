@@ -1,5 +1,5 @@
 // Offline support: keeps the app working without internet after the first visit.
-const CACHE = 'napalma-v1';
+const CACHE = 'napalma-v2';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
