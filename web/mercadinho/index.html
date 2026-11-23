@@ -1437,11 +1437,8 @@ function bubble(x, y, draw, w) {
 function drawBubble(c) {
   const a = proj(c.x, 1.55, c.y); if (a.z > 1) return;
   if (c.state === 'shop' || c.state === 'in') {
-    const it = c.list[Math.min(c.li, c.list.length - 1)], n = c.list.length;
-    bubble(a.x, a.y, (x, y) => {
-      drawE(P[it.item].e, x - U * (n > 1 ? .48 : .27), y, U * .34); txt(`${it.have}/${it.want}`, x - U * (n > 1 ? .05 : -.2), y, U * .24, '#1f2a22', null, 900);
-      if (n > 1) { rr(x + U * .2, y - U * .17, U * .5, U * .34, U * .17, '#f7a1c4'); txt(`${c.li + 1}/${n}`, x + U * .45, y + 1, U * .2, '#fff', null, 900); }
-    }, U * (n > 1 ? 1.55 : 1.2));
+    const it = c.list[Math.min(c.li, c.list.length - 1)];
+    bubble(a.x, a.y, (x, y) => { drawE(P[it.item].e, x - U * .27, y, U * .34); txt(`${it.have}/${it.want}`, x + U * .2, y, U * .24, '#1f2a22', null, 900); }, U * 1.2);
   }
   else if (c.state === 'queue' && queue[0] === c && !staffed()) bubble(a.x, a.y, (x, y) => drawE('💲', x, y, U * .34), U * .7);
   else if (c.state === 'out' && c.angry && !c.happy) bubble(a.x, a.y, (x, y) => drawE('😠', x, y, U * .36), U * .7);
