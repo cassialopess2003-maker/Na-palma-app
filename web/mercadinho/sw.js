@@ -1,5 +1,5 @@
 // Offline support for the game: works without internet after the first visit.
-const CACHE = 'mercadinho-v9';
+const CACHE = 'mercadinho-v10';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png', './three.min.js'];
 
 self.addEventListener('install', e => {

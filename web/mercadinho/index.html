@@ -347,7 +347,7 @@ const helperSpeed = () => 2.8 * (1 + 0.12 * S.up.train);
 const PLOT_CAP = 6, M_IN = 10, M_OUT = 8;
 const capOf = s => s.kind === 'shelf' ? shelfCap() : s.kind === 'machine' ? M_OUT : PLOT_CAP;
 
-const TRASH = { x: 9.65, y: 9.55 };
+const TRASH = { x: 14.3, y: 9.95 };
 let trashOpen = 0;
 const REG_STAND = { x: 2.4, y: 5.55 }, CASH = { x: 4.15, y: 6.6 }, DOOR_IN = { x: 0.8, y: 9.3 }, DOOR_OUT = { x: -1.6, y: 9.3 }, GAP = { x: 7.5, y: 11 };
 const WALLS = [{ x: -0.15, y: -0.3, w: 0.3, h: 8.85 }, { x: -0.15, y: 10.05, w: 0.3, h: 1.1 },
@@ -418,7 +418,7 @@ function load(cloudData) {
     for (const s of stations) {
       if (s.unlocked && s.kind === 'plot') {
         let add = Math.max(0, Math.min(PLOT_CAP - s.stock, Math.floor(away * growMult() / s.time)));
-        if (s.look === 'coop') { add = Math.min(add, s.input); s.input -= add; }
+        if (isAnimal(s)) { add = Math.min(add, s.input); s.input -= add; }
         s.stock += add;
       }
       s.stock = Math.min(s.stock, capOf(s));
@@ -576,11 +576,13 @@ function route(o, p) {
 }
 // Chickens eat corn: 1 corn = 2 eggs; the feeder holds 6 corn.
 const FEED_CAP = 12;
+const isAnimal = s => s.look === 'coop' || s.look === 'barn';
+const ANIMAL = { coop: ['As galinhas', 'galinheiro', 'botarem ovos'], barn: ['As vacas', 'curral', 'darem leite'] };
 const sinkItem = s => s.kind === 'shelf' ? s.item : s.kind === 'machine' ? s.inItem : 'milho';
-const isSink = s => s.unlocked && (s.kind === 'shelf' || s.kind === 'machine' || s.look === 'coop');
+const isSink = s => s.unlocked && (s.kind === 'shelf' || s.kind === 'machine' || isAnimal(s));
 const sinkSpace = s => s.kind === 'shelf' ? shelfCap() - s.stock : s.kind === 'machine' ? M_IN - s.input : Math.floor((FEED_CAP - s.input) / 2);
 const sinkCap = s => s.kind === 'shelf' ? shelfCap() : s.kind === 'machine' ? M_IN : FEED_CAP / 2;
-function sinkPut(s) { if (s.kind === 'shelf') s.stock++; else s.input += s.look === 'coop' ? 2 : 1; s.bump = 0.6; }
+function sinkPut(s) { if (s.kind === 'shelf') s.stock++; else s.input += isAnimal(s) ? 2 : 1; s.bump = 0.6; }
 const hasRoomFor = k => stations.some(s => isSink(s) && sinkItem(s) === k && sinkSpace(s) > 0);
 // Farm products and juice boxes each sit in their own spot and are picked one by one.
 function initSlots(s) { s.slots = Array.from({ length: capOf(s) }, (_, i) => i < s.stock); }
@@ -638,7 +640,7 @@ function playerAct() {
         return true;
       }
     }
-    if (s.look === 'coop' && near(s, player, 0.6)) {
+    if (isAnimal(s) && near(s, player, 0.6)) {
       const i = st.lastIndexOf('milho');
       if (i >= 0 && sinkSpace(s) > 0) { st.splice(i, 1); sinkPut(s); fly('milho', player.x, player.y, 0.9, s.x, s.y + .25, 0.25); sfx('drop'); return true; }
     }
@@ -817,7 +819,7 @@ function planHelper(h) {
     const src = srcs.reduce((a, b) => b.stock > a.stock ? b : a);
     if (src.stock === 0 && space < 3) continue;
     const taken = helpers.some(o => o !== h && o.sink === sk) ? 0.35 : 1;
-    const sc = (space / sinkCap(sk)) * taken + (sk.look === 'coop' && sk.input === 0 ? .6 : 0) + src.stock * 0.06 + Math.random() * 0.1;
+    const sc = (space / sinkCap(sk)) * taken + (isAnimal(sk) && sk.input === 0 ? .6 : 0) + src.stock * 0.06 + Math.random() * 0.1;
     if (sc > score) { score = sc; best = { sk, src }; }
   }
   if (best) { h.sink = best.sk; h.src = best.src; h.state = 'toSrc'; h.path = route(h, srcPoint(best.src)); }
@@ -874,8 +876,8 @@ function objective() {
   const waiting = customers.find(c => c.state === 'shop' && mood(c) >= 1);
   if (waiting) { const sh = waiting.list[waiting.li].sh; return { text: `Tem cliente esperando ${P[sh.item].n.toLowerCase()} 😕 Abasteça a prateleira!`, p: sh }; }
   if (player.stack.length >= bagCap() && !player.stack.some(hasRoomFor)) return { text: 'Não cabe mais nas prateleiras? Jogue o que sobrou na lixeira 🗑️', p: TRASH };
-  const hungry = stations.find(s => s.unlocked && s.look === 'coop' && s.input <= 0 && s.stock === 0);
-  if (hungry) return { text: 'As galinhas estão com fome! Leve milho 🌽 ao galinheiro para elas botarem ovos.', p: hungry };
+  const hungry = stations.find(s => s.unlocked && isAnimal(s) && s.input <= 0 && s.stock === 0);
+  if (hungry) { const [who, where, what] = ANIMAL[hungry.look]; return { text: `${who} estão com fome! Leve milho 🌽 ao ${where} para elas ${what}.`, p: hungry }; }
   for (const p of visiblePads()) if (S.money >= p.cost - p.paid) return { p };
   if (!S.cashier && queue.length >= 3 && dist(player, reg) > 0.8) return { p: reg };
   return null;
@@ -890,7 +892,7 @@ function update(dt) {
     s.bump = Math.max(0, s.bump - dt * 4);
     if (!s.unlocked) continue;
     if (s.kind === 'plot' || s.kind === 'machine') checkSlots(s);
-    if (s.look === 'coop') { if (s.input > 0 && s.stock < PLOT_CAP) { s.t += dt * gm; if (s.t >= s.time) { s.t = 0; s.input--; addSlot(s); } } }
+    if (isAnimal(s)) { if (s.input > 0 && s.stock < PLOT_CAP) { s.t += dt * gm; if (s.t >= s.time) { s.t = 0; s.input--; addSlot(s); } } }
     else if (s.kind === 'plot' && s.stock < PLOT_CAP) { s.t += dt * gm; if (s.t >= s.time) { s.t = 0; addSlot(s); } }
     if (s.kind === 'machine') { if (s.input > 0 && s.stock < M_OUT) { s.t += dt * gm; if (s.t >= s.time) { s.t = 0; s.input--; addSlot(s); } } }
   }
@@ -1171,6 +1173,8 @@ function buildStation(s) {
       part(pen, 'box', fence, [.05, .06, 2 * hh], [-hw, y, 0]); part(pen, 'box', fence, [.05, .06, 2 * hh], [hw, y, 0]);
     }
     part(g, 'box', 0x8b5a2b, [2.1, .18, .36], [0, .11, .98], { line: .02 });
+    part(g, 'box', 0x8b5a2b, [1.4, .2, .3], [0, .16, .2], { line: .02 }); part(g, 'box', 0x5a3820, [1.28, .02, .2], [0, .27, .2]);
+    s.feedM = part(g, 'box', 0x9ccc3a, [1.26, .06, .18], [0, .29, .2], { cast: false }); // hay-green corn mash
     const cow = buildCow(); cow.position.set(0, 0, -.45); cow.rotation.y = .5; cow.scale.setScalar(.9); g.add(cow); s.anim = [cow];
   } else if (s.look === 'tree') {
     part(g, 'cyl', TH.treeBase, [2.5, .04, 2.5], [0, .02, 0]);
@@ -1258,7 +1262,7 @@ function buildWorld() {
   for (let x = 1; x < W + 2; x += 3.2) decoTree(x, H + 1.8 + (x % 2) * .5, 1);
   for (let x = -.5; x < W + 1; x += 2.1) part(scene, 'ico', TH.bush, [.9, .6, .7], [x + .5, .25, -.75], { line: .03 });
   // Potted plants inside the shop
-  for (const [x, z] of [[.55, .55], [14.45, .55], [14.45, 10.3], [5.4, 10.3]]) {
+  for (const [x, z] of [[.55, .55], [14.45, .55], [5.4, 10.3]]) {
     part(scene, 'taper', 0xd98a6a, [.42, .4, .42], [x, .2, z], { line: .02, rot: [Math.PI, 0, 0] });
     part(scene, 'ico', 0x4cb043, [.55, .5, .55], [x, .62, z], { line: .025 }); part(scene, 'ico', 0x5fae3a, [.32, .3, .32], [x + .12, .86, z - .05]);
   }
@@ -1316,15 +1320,18 @@ $('#btnOpen').addEventListener('click', () => {
 let trashLid = null;
 function buildTrash() {
   const g = new THREE.Group(); g.position.set(TRASH.x, 0, TRASH.y); scene.add(g);
-  part(g, 'cyl', 0x7fd6b0, [.5, .62, .5], [0, .31, 0], { line: .03 });
-  // Label wrapped around the front of the bin (curved, so it reads straight from the camera)
-  const lbl = canvasTex(256, 64, (c, w, h) => {
-    c.fillStyle = '#ffffff'; c.fillRect(0, 0, w, h);
-    c.fillStyle = '#2f7d5b'; c.font = '900 46px ui-rounded,system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('LIXO', w / 2, h / 2 + 2);
+  // One cylinder whose side texture already carries the white band and the word "LIXO" (nothing layered on top).
+  const tex = canvasTex(512, 128, (c, w, h) => {
+    c.fillStyle = '#7fd6b0'; c.fillRect(0, 0, w, h);
+    c.fillStyle = '#ffffff'; c.fillRect(0, h * .3, w, h * .36);
+    c.fillStyle = '#2f7d5b'; c.font = '900 38px ui-rounded,system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle';
+    c.fillText('LIXO', w / 2, h * .48 + 2);
   });
-  lbl.wrapS = lbl.wrapT = THREE.ClampToEdgeWrapping; lbl.repeat.set(1, 1);
-  const band = new THREE.Mesh(new THREE.CylinderGeometry(.258, .258, .15, 24, 1, true, -1.15, 2.3), new THREE.MeshBasicMaterial({ map: lbl }));
-  band.position.y = .38; g.add(band);
+  tex.wrapS = tex.wrapT = THREE.ClampToEdgeWrapping; tex.repeat.set(1, 1);
+  const side = new THREE.MeshToonMaterial({ map: tex, gradientMap: gradTex }), cap = mat(0x6fc8a2);
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(.25, .23, .62, 28), [side, cap, cap]);
+  body.position.y = .31; body.rotation.y = Math.PI; body.castShadow = body.receiveShadow = true; g.add(body);
+  const ol = new THREE.Mesh(body.geometry, OUTLINE); ol.scale.set(1.12, 1.05, 1.12); body.add(ol);
   trashLid = new THREE.Group(); trashLid.position.set(0, .63, -.25); g.add(trashLid);
   part(trashLid, 'cyl', 0x5fbf98, [.56, .06, .56], [0, 0, .25], { line: .025 }); part(trashLid, 'box', 0x3f9b7a, [.18, .05, .06], [0, .05, .25]);
 }
@@ -1374,7 +1381,12 @@ function syncStation(s) {
     });
   } else if (s.look === 'barn') {
     for (let i = 0; i < 6; i++) if (sl[i]) putItem('leite', s.x + (i - 2.5) * .32, .2, s.y + .98, 1.05);
-    const cow = s.anim[0]; cow.position.x = Math.sin(time * .4 + s.y) * .3; cow.userData.head.rotation.x = Math.sin(time * 1.3 + s.y) * .15;
+    const cow = s.anim[0], fedC = s.input > 0, fc = s.input / FEED_CAP;
+    s.feedM.visible = fedC; s.feedM.scale.y = .02 + .06 * fc; s.feedM.position.y = .27 + .03 * fc;
+    if (fedC) { // eating at the trough
+      cow.position.set(Math.sin(time * .3 + s.y) * .25, 0, -.42); cow.rotation.y = 0;
+      cow.userData.head.rotation.x = .45 + Math.max(0, Math.sin(time * 3 + s.y)) * .25;
+    } else { cow.position.set(Math.sin(time * .2 + s.y) * .15, 0, -.5); cow.rotation.y = .5; cow.userData.head.rotation.x = -.1; }
   } else if (s.look === 'tree') {
     s.canopy.scale.setScalar(1 + Math.sin(time * 1.5 + s.x) * .015);
     for (let i = 0; i < 6; i++) if (sl[i]) { const [ax, ay, az] = APPLE_SPOTS[i]; putItem('maca', s.x + ax, ay - .15, s.y + az, 1.4); }
@@ -1478,7 +1490,7 @@ function drawOverlay() {
   for (const s of stations) {
     if (!s.unlocked) continue;
     if (s.kind === 'shelf') { const a = proj(s.x + s.w / 2 - .32, .12, s.y + s.h / 2 + .12); pill(a.x, a.y, `${s.stock}/${shelfCap()}`, s.stock ? '#2f9e5b' : '#d9443a', U * .22); }
-    if (s.look === 'coop') { const a = proj(s.x + .85, 1.55, s.y - .65), c = Math.ceil(s.input / 2); pill(a.x, a.y, c ? `🌽 ${c}/${FEED_CAP / 2}` : '🌽 fome!', c ? '#1f2a22' : '#d9443a', U * .2); }
+    if (isAnimal(s)) { const a = s.look === 'coop' ? proj(s.x + .85, 1.55, s.y - .65) : proj(s.x + .85, 1.5, s.y - .6), c = Math.ceil(s.input / 2); pill(a.x, a.y, c ? `🌽 ${c}/${FEED_CAP / 2}` : '🌽 fome!', c ? '#1f2a22' : '#d9443a', U * .2); }
     if (s.kind === 'machine') { const a = proj(s.x - .5, 1.95, s.y - .3); pill(a.x, a.y, `🍎 ${s.input}/${M_IN}`, '#1f2a22', U * .2); if (s.input > 0) bar(proj(s.x, 1.15, s.y - .2), s.t / s.time, U); }
   }
   if (queue.length && staffed() && regT > 0) bar(proj(byId.reg.x, 1.55, byId.reg.y), regT / 0.45, U);
