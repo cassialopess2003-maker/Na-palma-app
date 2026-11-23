@@ -162,7 +162,28 @@ const glc = $('#gl'), ov = $('#ov'), ctx = ov.getContext('2d');
 let DPR = 1, VW = 0, VH = 0, U = 48, camDist = 18;
 const renderer = new THREE.WebGLRenderer({ canvas: glc, antialias: true, powerPreference: 'high-performance' });
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-const SKY = 0xa8dcf0; renderer.setClearColor(SKY);
+// Color palettes for the 3D world.
+const THEMES = {
+  classico: { sky: 0xa8dcf0, base: 0x6db04f, floor: ['#f4e8d0', '#e8d6b3'], grass: ['#8fcf65', '#86c75c'], street: 0x80878e, side: 0xd6d0c2, path: 0xd9b77f, mat: 0xc0392b,
+    wall: 0xeed3ab, back: 0xd56b4b, awn: [0x2f9e5b, 0xffffff], sign: '#c0392b', outline: 0x3b2a1f, soil: [0x7a4d26, 0x9a6337, 0x83532c], wood: [0xa86b3c, 0x8a5530],
+    reg: [0x8d6e63, 0xbca08a], straw: 0xe2c675, pen: 0x9ccc65, treeBase: 0x5aa83f, bush: 0x358a33, hemi: [0xffffff, 0x7d9466, 0.5], sun: [0xfff4e0, 0.6] },
+  pastel: { sky: 0xffe1ec, base: 0x9fd4ad, floor: ['#fff6fa', '#fbe3ee'], grass: ['#bfe8c9', '#b2dfbf'], street: 0xa9a3c4, side: 0xf3e6f0, path: 0xf6dcb0, mat: 0xf78fb3,
+    wall: 0xffe9d6, back: 0xf7a1c4, awn: [0xb5a8f0, 0xffffff], sign: '#c95a8a', outline: 0x6b4f6e, soil: [0xb98572, 0xd4a48e, 0xc49380], wood: [0xe8bd96, 0xd4a27a],
+    reg: [0xc9a9d9, 0xe6d3ef], straw: 0xffe3a3, pen: 0xc5ebb0, treeBase: 0x9fd4ad, bush: 0x8fcf9f, hemi: [0xffffff, 0xd9b8c8, 0.55], sun: [0xfff0f5, 0.55] },
+  entardecer: { sky: 0xffc48c, base: 0x8fb04a, floor: ['#ffe8c2', '#f7d6a0'], grass: ['#a7c957', '#9cbf4d'], street: 0x6d5f6b, side: 0xe8c9a6, path: 0xe9c46a, mat: 0x264653,
+    wall: 0xf2d0a4, back: 0xe76f51, awn: [0x264653, 0xf4a261], sign: '#e76f51', outline: 0x3d2314, soil: [0x8d5524, 0xa86b3c, 0x96602e], wood: [0xb5651d, 0x8f4f17],
+    reg: [0x2a9d8f, 0x7fcdc1], straw: 0xf4c46a, pen: 0xb5cf6a, treeBase: 0x86a843, bush: 0x6c8f32, hemi: [0xffe0c0, 0x8a6a4a, 0.5], sun: [0xffc890, 0.68] },
+  noite: { sky: 0x1d2a4a, base: 0x2f6b4c, floor: ['#d9d3f0', '#c7bfe6'], grass: ['#4a8a63', '#438259'], street: 0x3a3f55, side: 0x8f8aa8, path: 0xa68a64, mat: 0xef476f,
+    wall: 0xb9a7e0, back: 0x6c4ab6, awn: [0xffd166, 0xef476f], sign: '#6c4ab6', outline: 0x120c1f, soil: [0x5c3d2e, 0x6f4a37, 0x664333], wood: [0x8a5a44, 0x6b4433],
+    reg: [0x5a4a8a, 0x8f7fc4], straw: 0xd9b45a, pen: 0x5f9e6e, treeBase: 0x2f6b4c, bush: 0x25573d, hemi: [0xb8c4ff, 0x2a2a4a, 0.62], sun: [0xffe7a8, 0.5] },
+  tropical: { sky: 0x7fdbff, base: 0xf2d49b, floor: ['#e3f8f5', '#c9eee8'], grass: ['#7fd68f', '#74cc84'], street: 0x4aa3c9, side: 0xfbe7c0, path: 0xf2d49b, mat: 0xff6b6b,
+    wall: 0xfde2b8, back: 0x00a6a6, awn: [0xff6b6b, 0xffffff], sign: '#00a6a6', outline: 0x1f3b4d, soil: [0xa0522d, 0xb8693a, 0xa95c32], wood: [0xc98b52, 0xa8703f],
+    reg: [0xffb347, 0xffd699], straw: 0xffe08a, pen: 0x9be0a0, treeBase: 0x6cc77d, bush: 0x2fa36b, hemi: [0xffffff, 0x8fc9b0, 0.52], sun: [0xfffbe8, 0.62] },
+};
+let TEMA = window.TEMA || 'classico';
+try { const sv = JSON.parse(localStorage.getItem('mercadinho-save-v1') || 'null'); if (!window.TEMA && sv && THEMES[sv.tema]) TEMA = sv.tema; } catch (e) {}
+const TH = THEMES[TEMA] || THEMES.classico;
+const SKY = TH.sky; renderer.setClearColor(SKY);
 const scene = new THREE.Scene(); scene.fog = new THREE.Fog(SKY, 34, 70);
 const camera = new THREE.PerspectiveCamera(38, 1, 0.5, 150);
 const CAM_DIR = new THREE.Vector3(0, 0.72, 0.69).normalize();
@@ -654,7 +675,7 @@ const gradTex = new THREE.DataTexture(new Uint8Array([105, 185, 235]), 3, 1, THR
 gradTex.minFilter = gradTex.magFilter = THREE.NearestFilter; gradTex.generateMipmaps = false; gradTex.needsUpdate = true;
 const matCache = new Map();
 function mat(c) { let m = matCache.get(c); if (!m) { m = new THREE.MeshToonMaterial({ color: c, gradientMap: gradTex }); matCache.set(c, m); } return m; }
-const OUTLINE = new THREE.MeshBasicMaterial({ color: 0x3b2a1f, side: THREE.BackSide });
+const OUTLINE = new THREE.MeshBasicMaterial({ color: TH.outline, side: THREE.BackSide });
 const GEO = { box: new THREE.BoxGeometry(1, 1, 1), sph: new THREE.SphereGeometry(0.5, 18, 14), cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 18),
   cone: new THREE.ConeGeometry(0.5, 1, 14), ico: new THREE.IcosahedronGeometry(0.5, 1), plane: new THREE.PlaneGeometry(1, 1) };
 // One cartoon part: scaled shape with toon shading and an optional ink outline (inverted hull).
@@ -765,8 +786,8 @@ const APPLE_SPOTS = [[-.55, 1.75, .78], [0, 2.35, .75], [.55, 1.75, .78], [-.3, 
 function buildStation(s) {
   const g = new THREE.Group(); g.position.set(s.x, 0, s.y); scene.add(g); s.g = g; const w = s.w, h = s.h;
   if (s.look === 'field') {
-    part(g, 'box', 0x7a4d26, [w, .16, h], [0, .08, 0], { line: .03 }); part(g, 'box', 0x9a6337, [w - .15, .04, h - .15], [0, .17, 0]);
-    for (const dz of [-.55, .5]) part(g, 'box', 0x83532c, [w - .3, .07, .55], [0, .2, dz]);
+    part(g, 'box', TH.soil[0], [w, .16, h], [0, .08, 0], { line: .03 }); part(g, 'box', TH.soil[1], [w - .15, .04, h - .15], [0, .17, 0]);
+    for (const dz of [-.55, .5]) part(g, 'box', TH.soil[2], [w - .3, .07, .55], [0, .2, dz]);
     const c = s.item === 'milho' ? 0x5fae3a : 0x3f9b3a;
     s.sprouts = PLANT_SPOTS.map(([dx, dz]) => {
       const sp = new THREE.Group(); sp.position.set(dx, .22, dz); g.add(sp);
@@ -774,7 +795,7 @@ function buildStation(s) {
       part(sp, 'cyl', 0x4cb043, [.04, .2, .04], [0, .1, 0]); return sp;
     });
   } else if (s.look === 'coop') {
-    part(g, 'box', 0xe2c675, [w, .08, h], [0, .04, 0], { line: .03 });
+    part(g, 'box', TH.straw, [w, .08, h], [0, .04, 0], { line: .03 });
     const hs = new THREE.Group(); hs.position.set(0, 0, -.65); g.add(hs);
     part(hs, 'box', 0xd98a5a, [1.7, .85, .9], [0, .5, 0], { line: .03 }); part(hs, 'box', 0x6b3a22, [.4, .55, .04], [0, .36, .46]);
     for (const sd of [-1, 1]) part(hs, 'box', 0xe0483c, [1.05, .08, 1.12], [sd * .43, 1.13, 0], { rot: [0, 0, -sd * .62], line: .03 });
@@ -782,7 +803,7 @@ function buildStation(s) {
     s.anim = [buildChicken(0xffffff), buildChicken(0xf4a259)];
     s.anim.forEach((c, i) => { c.position.set(i ? .55 : -.6, .08, .15); g.add(c); });
   } else if (s.look === 'barn') {
-    part(g, 'box', 0x9ccc65, [w, .06, h], [0, .03, 0]);
+    part(g, 'box', TH.pen, [w, .06, h], [0, .03, 0]);
     const fence = 0xa0663a, hw = w / 2 - .08, hh = h / 2 - .08, posts = [];
     for (let i = 0; i <= 4; i++) { const t = -hw + i * (hw / 2); posts.push([t, -hh], [t, hh]); }
     for (let i = 1; i < 4; i++) { const t = -hh + i * (hh / 2); posts.push([-hw, t], [hw, t]); }
@@ -794,7 +815,7 @@ function buildStation(s) {
     part(g, 'box', 0x8b5a2b, [2.0, .18, .42], [0, .11, .78], { line: .02 });
     const cow = buildCow(); cow.position.set(0, 0, -.25); cow.rotation.y = .5; g.add(cow); s.anim = [cow];
   } else if (s.look === 'tree') {
-    part(g, 'cyl', 0x5aa83f, [2.5, .04, 2.5], [0, .02, 0]);
+    part(g, 'cyl', TH.treeBase, [2.5, .04, 2.5], [0, .02, 0]);
     part(g, 'cyl', 0x8b5a2b, [.3, 1.3, .3], [0, .65, 0], { line: .03 });
     const cn = new THREE.Group(); cn.position.y = 1.8; g.add(cn); s.canopy = cn;
     part(cn, 'ico', 0x3f9b3a, [1.9, 1.6, 1.8], [0, 0, 0], { line: .04 });
@@ -805,14 +826,14 @@ function buildStation(s) {
     part(g, 'box', 0x4263eb, [.5, .25, .3], [.55, .35, .3], { line: .02 });
     part(g, 'box', 0xced4da, [2.1, .12, .5], [0, .06, .6], { line: .02 });
   } else if (s.kind === 'shelf') {
-    const fr = s.look === 'fridge', wood = fr ? 0xe9f5fc : 0xa86b3c, dark = fr ? 0x9cc9e6 : 0x8a5530;
+    const fr = s.look === 'fridge', wood = fr ? 0xe9f5fc : TH.wood[0], dark = fr ? 0x9cc9e6 : TH.wood[1];
     part(g, 'box', dark, [w, .12, h], [0, .06, 0], { line: .03 });
     part(g, 'box', wood, [w, 1.1, .08], [0, .6, -h / 2 + .04], { line: .03 });
     for (const sd of [-1, 1]) part(g, 'box', wood, [.08, 1.1, h], [sd * (w / 2 - .04), .6, 0], { line: .03 });
     part(g, 'box', wood, [w - .12, .05, h - .04], [0, .38, 0]); part(g, 'box', wood, [w - .12, .05, h / 2], [0, .8, -h / 4]);
     part(g, 'box', fr ? 0x4dabf7 : 0xffffff, [w, .12, .1], [0, 1.18, -h / 2 + .05], { line: .02 });
   } else if (s.kind === 'register') {
-    part(g, 'box', 0x8d6e63, [w, .78, h], [0, .39, 0], { line: .03 }); part(g, 'box', 0xbca08a, [w + .08, .06, h + .08], [0, .8, 0]);
+    part(g, 'box', TH.reg[0], [w, .78, h], [0, .39, 0], { line: .03 }); part(g, 'box', TH.reg[1], [w + .08, .06, h + .08], [0, .8, 0]);
     part(g, 'box', 0x455a64, [.5, .3, .4], [-.55, .98, -.1], { line: .02 }); part(g, 'box', 0xa5f3c2, [.38, .16, .03], [-.55, 1.02, .11]);
     part(g, 'box', 0x2f2f2f, [.95, .03, .5], [.45, .84, 0]);
   }
@@ -850,23 +871,23 @@ function decoTree(x, z, s = 1) {
   part(g, 'ico', 0x4cb043, [.9, .8, .9], [.2, 2.05, .1]);
 }
 function buildWorld() {
-  ground(-40, -40, 40, 60, 0x6db04f, -0.02);
-  ground(0, 0, W, STORE_H, 0, 0, texMat(canvasTex(64, 64, checker('#f4e8d0', '#e8d6b3'), W / 2, STORE_H / 2)));
-  ground(0, STORE_H, W, H + .5, 0, 0, texMat(canvasTex(64, 64, checker('#8fcf65', '#86c75c'), W / 2, (H + .5 - STORE_H) / 2)));
-  ground(-10, -4, -1.3, H + 8, 0x80878e, 0.001); ground(-1.3, -4, 0, H + 8, 0xd6d0c2, 0.002);
+  ground(-40, -40, 40, 60, TH.base, -0.02);
+  ground(0, 0, W, STORE_H, 0, 0, texMat(canvasTex(64, 64, checker(TH.floor[0], TH.floor[1]), W / 2, STORE_H / 2)));
+  ground(0, STORE_H, W, H + .5, 0, 0, texMat(canvasTex(64, 64, checker(TH.grass[0], TH.grass[1]), W / 2, (H + .5 - STORE_H) / 2)));
+  ground(-10, -4, -1.3, H + 8, TH.street, 0.001); ground(-1.3, -4, 0, H + 8, TH.side, 0.002);
   for (let z = -3; z < H + 7; z += 1.6) ground(-4.6, z, -4.35, z + .8, 0xffffff, .004);
-  ground(7.1, STORE_H, 7.9, H + .5, 0xd9b77f, .004);
-  for (const [z0, z1] of [[12.1, 12.6], [16.2, 16.6], [20.05, 20.45]]) ground(.4, z0, W - .4, z1, 0xd9b77f, .004);
-  ground(.15, 8.6, 1.05, 10, 0xc0392b, .006);
-  for (const w of WALLS) part(scene, 'box', 0xeed3ab, [w.w, .7, w.h], [w.x + w.w / 2, .35, w.y + w.h / 2], { line: .03 });
-  part(scene, 'box', 0xeed3ab, [.3, .7, STORE_H + .2], [W + .15, .35, STORE_H / 2 - .1], { line: .03 });
+  ground(7.1, STORE_H, 7.9, H + .5, TH.path, .004);
+  for (const [z0, z1] of [[12.1, 12.6], [16.2, 16.6], [20.05, 20.45]]) ground(.4, z0, W - .4, z1, TH.path, .004);
+  ground(.15, 8.6, 1.05, 10, TH.mat, .006);
+  for (const w of WALLS) part(scene, 'box', TH.wall, [w.w, .7, w.h], [w.x + w.w / 2, .35, w.y + w.h / 2], { line: .03 });
+  part(scene, 'box', TH.wall, [.3, .7, STORE_H + .2], [W + .15, .35, STORE_H / 2 - .1], { line: .03 });
   // Back wall, awning and sign
-  part(scene, 'box', 0xd56b4b, [W + .6, 2.4, .4], [W / 2, 1.2, -.35], { line: .04 });
-  for (let i = 0; i < W; i++) part(scene, 'box', i % 2 ? 0xffffff : 0x2f9e5b, [1, .07, .9], [i + .5, 2.35, .05], { rot: [.42, 0, 0], line: .02 });
+  part(scene, 'box', TH.back, [W + .6, 2.4, .4], [W / 2, 1.2, -.35], { line: .04 });
+  for (let i = 0; i < W; i++) part(scene, 'box', TH.awn[i % 2], [1, .07, .9], [i + .5, 2.35, .05], { rot: [.42, 0, 0], line: .02 });
   const sign = new THREE.Mesh(GEO.plane, new THREE.MeshBasicMaterial({ map: canvasTex(512, 96, (g, w, h) => {
     g.fillStyle = '#fff7e0'; g.beginPath(); g.roundRect(4, 4, w - 8, h - 8, 26); g.fill();
     g.lineWidth = 6; g.strokeStyle = '#3b2a1f'; g.stroke();
-    g.fillStyle = '#c0392b'; g.font = '900 62px ui-rounded,system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('MERCADINHO', w / 2, h / 2 + 3);
+    g.fillStyle = TH.sign; g.font = '900 62px ui-rounded,system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('MERCADINHO', w / 2, h / 2 + 3);
   }) }));
   sign.scale.set(5.2, .975, 1); sign.position.set(W / 2, 1.45, -.14); scene.add(sign);
   // Farm fence, trees and bushes around the edges
@@ -874,11 +895,11 @@ function buildWorld() {
   part(scene, 'box', 0xa0663a, [.05, .06, H - STORE_H], [-.1, .4, (H + STORE_H) / 2]);
   for (let z = 1.5; z < H + 2; z += 3.4) decoTree(W + 1.6 + (z % 2), z, .9 + (z % 3) * .1);
   for (let x = 1; x < W + 2; x += 3.2) decoTree(x, H + 1.8 + (x % 2) * .5, 1);
-  for (let x = -.5; x < W + 1; x += 2.1) part(scene, 'ico', 0x358a33, [.9, .6, .7], [x + .5, .25, -.75], { line: .03 });
+  for (let x = -.5; x < W + 1; x += 2.1) part(scene, 'ico', TH.bush, [.9, .6, .7], [x + .5, .25, -.75], { line: .03 });
 }
 // Lights: soft sky light plus a sun with cartoon shadows that follows the camera.
-const hemi = new THREE.HemisphereLight(0xffffff, 0x7d9466, 0.5); scene.add(hemi);
-const sun = new THREE.DirectionalLight(0xfff4e0, 0.6); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
+const hemi = new THREE.HemisphereLight(TH.hemi[0], TH.hemi[1], TH.hemi[2]); scene.add(hemi);
+const sun = new THREE.DirectionalLight(TH.sun[0], TH.sun[1]); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
 Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 50 });
 sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.02; scene.add(sun, sun.target);
 
