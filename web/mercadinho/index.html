@@ -97,6 +97,13 @@ canvas { position: fixed; inset: 0; display: block; touch-action: none; }
 .danger { width: 100%; border: 0; border-radius: 14px; background: transparent; color: var(--danger); font: 700 16px var(--font); padding: 14px; cursor: pointer; }
 .note { color: var(--muted); font-size: 14px; line-height: 1.45; margin: 6px 4px 0; }
 
+#savedChip { position: fixed; left: max(12px, env(safe-area-inset-left, 0px)); top: calc(env(safe-area-inset-top, 0px) + 62px); background: rgba(255,255,255,.92); color: #2f9e5b;
+  font: 800 13px var(--font); padding: 5px 10px; border-radius: 999px; opacity: 0; transform: translateY(-4px); transition: .25s; pointer-events: none; }
+#savedChip.on { opacity: 1; transform: none; }
+#boot { position: fixed; inset: 0; background: var(--page); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; z-index: 20; color: #6b4f6e; font: 800 18px var(--font); }
+#boot div { font-size: 56px; animation: bob 1s ease-in-out infinite alternate; }
+@keyframes bob { to { transform: translateY(-10px); } }
+@media (prefers-reduced-motion: reduce) { #boot div { animation: none; } }
 /* Open / closed shop sign */
 #btnOpen { position: fixed; left: max(12px, env(safe-area-inset-left, 0px)); bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
   border: 3px solid #6b4f6e; border-radius: 14px; background: #fff7fb; color: #2f9e5b; font: 900 17px var(--font); letter-spacing: .06em;
@@ -139,6 +146,8 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
 <div id="hint" hidden></div>
 <button id="btnOpen" aria-label="Abrir ou fechar o mercado"><span class="led"></span><span><span id="openTxt">ABERTO</span><small id="openSub">toque para fechar</small></span></button>
 <div id="toast"></div>
+<div id="savedChip">✓ Jogo salvo</div>
+<div id="boot"><div>🛒</div><b>Abrindo o mercadinho…</b></div>
 
 <div class="scrim" id="upScrim" hidden>
   <div class="sheet" role="dialog" aria-label="Melhorias">
@@ -165,6 +174,9 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       <h3>Jogo</h3>
       <label class="row"><span>Sons</span><input type="checkbox" class="switch" id="optSound"></label>
       <label class="row"><span>Vibração (Android)</span><input type="checkbox" class="switch" id="optVib"></label>
+      <h3>Salvamento automático</h3>
+      <div class="row"><span>Onde fica salvo</span><span id="stSaveWhere">Neste aparelho</span></div>
+      <div class="row"><span>Último salvamento</span><span id="stSaveWhen">agora</span></div>
       <h3>Estatísticas</h3>
       <div class="row"><span>Total ganho</span><span id="stEarned">0</span></div>
       <div class="row"><span>Clientes atendidos</span><span id="stServed">0</span></div>
@@ -337,7 +349,7 @@ const capOf = s => s.kind === 'shelf' ? shelfCap() : s.kind === 'machine' ? M_OU
 const REG_STAND = { x: 2.4, y: 5.55 }, CASH = { x: 4.15, y: 6.6 }, DOOR_IN = { x: 0.8, y: 9.3 }, DOOR_OUT = { x: -1.6, y: 9.3 }, GAP = { x: 7.5, y: 11 };
 const WALLS = [{ x: -0.15, y: -0.3, w: 0.3, h: 8.85 }, { x: -0.15, y: 10.05, w: 0.3, h: 1.1 },
   { x: 0, y: 10.85, w: 6, h: 0.3 }, { x: 9, y: 10.85, w: 6, h: 0.3 }];
-function qslot(i) { return i < 4 ? { x: 2.4, y: 7.9 + i * 0.85 } : { x: 2.4 + (i - 3) * 0.85, y: 7.9 + 3 * 0.85 }; }
+function qslot(i) { return i < 3 ? { x: 2.4, y: 7.9 + i * 1.0 } : { x: 2.4 + (i - 2) * 1.05, y: 9.9 }; }
 
 const cash = { amount: 0 };
 const player = { x: 7.5, y: 9.6, dir: { x: 0, y: 1 }, moving: false, walkT: 0, stack: [], actT: 0,
@@ -352,12 +364,42 @@ function save() {
     S.saved = Date.now(); S.st = {};
     for (const s of stations) if (s.unlocked || s.paid) S.st[s.id] = [s.unlocked ? 1 : 0, s.stock, s.input, Math.round(s.paid * 100) / 100];
     S.cash = cash.amount; S.bag = player.stack.slice(); S.pos = [+player.x.toFixed(2), +player.y.toFixed(2)];
-    localStorage.setItem(KEY, JSON.stringify(S));
+    const json = JSON.stringify(S); lastSaved = S.saved;
+    try { localStorage.setItem(KEY, json); } catch (e) {}
+    cloudSave(json);
   } catch (e) {}
 }
-function load() {
+// Autosave: always in this browser; in the published page also in the player's claude.ai account
+// (a private per-person document), so progress survives cleared browser data and follows the account.
+let cloud = null, cloudBusy = false, cloudQueued = null, cloudLastOk = 0, lastSaved = 0;
+function cloudSave(json) {
+  if (!cloud) return;
+  if (cloudBusy) { cloudQueued = json; return; }
+  cloudBusy = true;
+  cloud.ref.set({ json, saved: S.saved }).then(() => { cloudLastOk = Date.now(); }, () => {}).finally(() => {
+    cloudBusy = false; if (cloudQueued) { const q = cloudQueued; cloudQueued = null; setTimeout(() => cloudSave(q), 1500); }
+  });
+}
+const within = (p, ms) => Promise.race([p, new Promise(r => setTimeout(() => r(null), ms))]);
+async function cloudLoad() {
+  try {
+    if (!window.claude || !window.claude.use) return null;
+    const [db, user] = await within(Promise.all([claude.use('db'), claude.use('user')]), 5000) || [];
+    if (!db || !user) return null;
+    const id = await within(user.id(), 4000); if (!id) return null;
+    const ref = db.doc('data/users/' + id + '/jogo');
+    cloud = { ref };
+    const snap = await within(ref.get(), 5000);
+    const data = snap && snap.exists && snap.data();
+    return data && typeof data.json === 'string' ? JSON.parse(data.json) : null;
+  } catch (e) { return null; }
+}
+let saveFlashT = 0;
+function saveNow() { save(); const el = $('#savedChip'); el.classList.add('on'); clearTimeout(saveFlashT); saveFlashT = setTimeout(() => el.classList.remove('on'), 1400); }
+function load(cloudData) {
   let d = null;
   try { d = JSON.parse(localStorage.getItem(KEY) || 'null'); } catch (e) {}
+  if (cloudData && cloudData.v === 1 && (!d || (cloudData.saved || 0) > (d.saved || 0))) d = cloudData;
   if (d && d.v === 1) {
     const up = Object.assign({}, S.up, d.up || {});
     Object.assign(S, d); S.up = up;
@@ -622,27 +664,41 @@ function unlock(s) {
   for (let i = 0; i < 50; i++) confetti.push({ x: s.x, z: s.y, h: .5, vx: rnd(-3, 3), vz: rnd(-3, 3), vh: rnd(4, 9), t: 0, c: pick(['#ffd43b', '#ff6b6b', '#4dabf7', '#69db7c', '#f783ac']) });
   sfx('unlock'); buzz(40); toast(`🎉 ${label(s)} liberado!`);
   if (S.tut === 4) setTut(5);
-  save();
+  saveNow();
 }
 function collectCash() {
   const a = cash.amount; cash.amount = 0; S.money += a;
   const n = Math.min(12, Math.ceil(a / 6)), m = moneyScreen(), cp = proj(CASH.x, .3, CASH.y);
   for (let i = 0; i < n; i++) coins.push({ sx: cp.x + rnd(-12, 12), sy: cp.y + rnd(-12, 12), tx: m.x, ty: m.y, t: -i * 0.04, d: 0.45 });
-  sfx('coin'); buzz(15);
+  sfx('coin'); buzz(15); save();
   if (S.tut === 3) setTut(4);
 }
 
 /* ---------- Customers ---------- */
+function spotFor(sh) { const k = (sh.spotN++) % 3; return { x: sh.x + (k - 1) * 0.85 + rnd(-0.08, 0.08), y: sh.y + 0.95 }; }
+// Each customer arrives with a shopping list: 1 to 3 different products, a few of each.
 function spawnCustomer(shelves) {
-  let tot = 0; const w = shelves.map(s => { const v = 1 + s.stock; tot += v; return v; });
-  let r = Math.random() * tot, sh = shelves[0];
-  for (let i = 0; i < shelves.length; i++) { r -= w[i]; if (r <= 0) { sh = shelves[i]; break; } }
-  const maxWant = Math.min(5, 2 + Math.floor((shelves.length - 1) / 2));
-  const spot = (sh.spotN++) % 3;
-  const c = { x: DOOR_OUT.x, y: DOOR_OUT.y + rnd(-0.2, 0.2), look: randLook(), item: sh.item, shelf: sh,
-    want: 1 + Math.floor(Math.random() * maxWant), have: 0, state: 'in', pat: 0, tk: 0, dir: { x: 1, y: 0 }, moving: false, walkT: rnd(0, 3),
-    path: [{ x: DOOR_IN.x, y: DOOR_IN.y }, ...storeLeg(DOOR_IN, { x: sh.x + (spot - 1) * 0.78 + rnd(-0.1, 0.1), y: sh.y + 0.95 })] };
+  const cand = shelves.slice(), list = [];
+  const nTypes = Math.min(cand.length, 1 + (Math.random() < .6 ? 1 : 0) + (Math.random() < .35 ? 1 : 0));
+  const maxWant = Math.min(4, 1 + Math.floor(shelves.length / 2));
+  while (list.length < nTypes) {
+    let tot = 0; const w = cand.map(s => { const v = 1 + s.stock; tot += v; return v; });
+    let r = Math.random() * tot, k = 0;
+    for (; k < cand.length - 1; k++) { r -= w[k]; if (r <= 0) break; }
+    const sh = cand.splice(k, 1)[0];
+    list.push({ sh, item: sh.item, want: 1 + Math.floor(Math.random() * maxWant), have: 0 });
+  }
+  list.sort((a, b) => a.sh.x - b.sh.x + (a.sh.y - b.sh.y) * 3);
+  const c = { x: DOOR_OUT.x, y: DOOR_OUT.y + rnd(-0.2, 0.2), look: randLook(), list, li: 0, got: [],
+    state: 'in', pat: 0, tk: 0, dir: { x: 1, y: 0 }, moving: false, walkT: rnd(0, 3), cm: 0,
+    path: [{ x: DOOR_IN.x, y: DOOR_IN.y }, ...storeLeg(DOOR_IN, spotFor(list[0].sh))] };
   customers.push(c);
+}
+function nextItem(c) {
+  c.li++; c.pat = 0;
+  if (c.li < c.list.length) { c.state = 'in'; c.path = storeLeg(c, spotFor(c.list[c.li].sh)); }
+  else if (c.got.length) toQueue(c);
+  else { c.angry = true; leave(c); }
 }
 function leave(c) { c.state = 'out'; c.path = [...storeLeg(c, DOOR_IN), { x: DOOR_OUT.x, y: DOOR_OUT.y }]; }
 function toQueue(c) { c.state = 'queue'; queue.push(c); c.path = storeLeg(c, { x: 3.9, y: 8.4 }); }
@@ -652,10 +708,10 @@ function updCustomer(c, dt) {
   else if (c.state === 'shop') {
     if (S.tut >= 5) c.pat += dt;
     c.tk -= dt; c.dir = { x: 0, y: -1 };
-    const sh = c.shelf;
-    if (sh.stock > 0 && c.tk <= 0) { sh.stock--; c.have++; c.tk = 0.35; sh.bump = 0.6; fly(c.item, sh.x + rnd(-0.8, 0.8), sh.y, 0.6, c.x, c.y, 0.9, 0.22); }
-    if (c.have >= c.want) toQueue(c);
-    else if (c.pat > 40) { c.angry = true; if (c.have > 0) toQueue(c); else leave(c); }
+    const it = c.list[c.li], sh = it.sh;
+    if (sh.stock > 0 && c.tk <= 0) { sh.stock--; it.have++; c.got.push(it.item); c.tk = 0.35; sh.bump = 0.6; fly(it.item, sh.x + rnd(-0.8, 0.8), sh.y, 0.6, c.x, c.y, 0.7, 0.22); }
+    if (it.have >= it.want) nextItem(c);
+    else if (c.pat > 40) { it.skipped = true; nextItem(c); }
   } else if (c.state === 'queue') {
     if (c.path.length) followPath(c, CS, dt); else { const q = qslot(queue.indexOf(c)); walk(c, q.x, q.y, CS, dt); }
     if (!c.moving) c.dir = { x: 0, y: -1 };
@@ -668,10 +724,10 @@ function updRegister(dt) {
   regT += dt;
   if (regT >= (dist(player, REG_STAND) < 0.8 ? 0.45 : 0.75)) {
     regT = 0; queue.shift();
-    const amt = Math.round(P[f.item].price * f.have * priceMult());
+    const amt = Math.round(f.got.reduce((t, k) => t + P[k].price, 0) * priceMult());
     cash.amount += amt; S.earned += amt; S.served++;
     floatText('+$' + amt, f.x, f.y, '#c8ffb0');
-    for (let i = 0; i < Math.min(5, f.have); i++) fly('nota', f.x, f.y, 0.9, CASH.x + rnd(-0.2, 0.2), CASH.y, 0.4, 0.3 + i * 0.05);
+    for (let i = 0; i < Math.min(6, f.got.length); i++) fly('nota', f.x, f.y, 0.9, CASH.x + rnd(-0.2, 0.2), CASH.y, 0.4, 0.3 + i * 0.05);
     sfx('cash'); f.happy = true; leave(f);
     if (S.tut === 2) setTut(3);
   }
@@ -775,7 +831,7 @@ function update(dt) {
   }
   updateSpawn(dt);
   for (const c of customers) updCustomer(c, dt);
-  for (let i = customers.length - 1; i >= 0; i--) if (customers[i].dead) { if (customers[i].pp) scene.remove(customers[i].pp.g); customers.splice(i, 1); }
+  for (let i = customers.length - 1; i >= 0; i--) if (customers[i].dead) { const c = customers[i]; if (c.pp) scene.remove(c.pp.g); if (c.cart) scene.remove(c.cart); customers.splice(i, 1); }
   updRegister(dt);
   for (const h of helpers) updHelper(h, dt);
   for (const f of flyers) f.t += dt;
@@ -955,6 +1011,48 @@ function buildCow() {
     part(hd, 'sph', 0xffffff, [.16, .08, .1], [sd * .27, .1, -.04]);
   }
   g.userData.head = hd; return g;
+}
+
+/* ---------- Shopping carts ---------- */
+const wireMat = new THREE.MeshToonMaterial({ gradientMap: gradTex, transparent: true, alphaTest: .4, side: THREE.DoubleSide, map: (() => {
+  const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d');
+  g.strokeStyle = '#e4e9f2'; g.lineWidth = 5; for (let i = 4; i < 64; i += 16) { g.beginPath(); g.moveTo(i, 0); g.lineTo(i, 64); g.stroke(); g.beginPath(); g.moveTo(0, i); g.lineTo(64, i); g.stroke(); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; return t; })() });
+function buildCart(parent = scene) {
+  const g = new THREE.Group(), F = 0xb5a8f0, L = .015, W2 = .23, Z2 = .31, y0 = .32, y1 = .64;
+  for (const [x, z] of [[-.19, -.26], [.19, -.26], [-.19, .26], [.19, .26]]) {
+    part(g, 'cyl', 0x4a4a5a, [.09, .05, .09], [x, .05, z], { rot: [0, 0, Math.PI / 2], line: L });
+    part(g, 'cyl', F, [.03, .26, .03], [x * .9, .2, z * .9], { line: L });
+  }
+  part(g, 'box', F, [W2 * 2, .03, Z2 * 2], [0, y0, 0], { line: L });
+  part(g, 'box', 0xd9d2ff, [W2 * 2 - .04, .12, .03], [0, .14, 0]);
+  const panel = (w, x, z, ry) => { const m = new THREE.Mesh(GEO.plane, wireMat); m.scale.set(w, y1 - y0, 1); m.position.set(x, (y0 + y1) / 2, z); m.rotation.y = ry; m.castShadow = true; g.add(m); };
+  panel(W2 * 2, 0, Z2, 0); panel(W2 * 2, 0, -Z2, 0); panel(Z2 * 2, W2, 0, Math.PI / 2); panel(Z2 * 2, -W2, 0, Math.PI / 2);
+  for (const z of [-Z2, Z2]) part(g, 'box', F, [W2 * 2 + .03, .03, .03], [0, y1, z], { line: L });
+  for (const x of [-W2, W2]) { part(g, 'box', F, [.03, .03, Z2 * 2], [x, y1, 0], { line: L }); part(g, 'box', F, [.03, .3, .03], [x, .75, -Z2 - .08], { rot: [-.45, 0, 0], line: L }); }
+  part(g, 'cyl', 0xf78fb3, [.06, W2 * 2 + .06, .06], [0, .88, -Z2 - .14], { rot: [0, 0, Math.PI / 2], line: L });
+  parent.add(g); return g;
+}
+// Cart is pushed in front while walking and parked beside the customer while shopping or queuing.
+function syncCart(c, dt) {
+  if (!c.cart) c.cart = buildCart();
+  const parked = c.state === 'shop' || (c.state === 'queue' && !c.moving);
+  c.cm += ((parked ? 1 : 0) - c.cm) * Math.min(1, dt * 6);
+  const r = c.pp.g.rotation.y, fx = Math.sin(r), fz = Math.cos(r), sc = .95;
+  const fwd = (.62 - .5 * c.cm) * sc, side = .58 * c.cm * sc;
+  const cx = c.x + fx * fwd + fz * side, cz = c.y + fz * fwd - fx * side;
+  c.cart.position.set(cx, 0, cz); c.cart.rotation.y = r; c.cart.scale.setScalar(sc);
+  const n = Math.min(c.got.length, 12), cr = Math.cos(r), sr = Math.sin(r);
+  for (let i = 0; i < n; i++) {
+    const k = c.got[i], col = i % 3, row = Math.floor(i / 3) % 2, lay = Math.floor(i / 6);
+    const lx = (col - 1) * .13, lz = (row - .5) * .26 + (lay ? .06 : 0);
+    putItem(k, cx + (lx * cr + lz * sr) * sc, .35 + lay * .17, cz + (-lx * sr + lz * cr) * sc, .85, r + i);
+  }
+}
+const rackCarts = [];
+function buildCartRack() {
+  part(scene, 'box', 0xb5a8f0, [1.9, .05, .05], [1.15, .55, 10.68], { line: .015 });
+  for (let i = 0; i < 4; i++) { const cg = buildCart(); cg.position.set(.55 + i * .36, 0, 10.42); cg.rotation.y = Math.PI / 2; cg.scale.setScalar(.85); rackCarts.push(cg); }
 }
 
 /* ---------- Stations ---------- */
@@ -1142,11 +1240,11 @@ $('#btnOpen').addEventListener('click', () => {
   unlockAudio(); S.open = !S.open; updateOpenUI(); sfx('buy'); buzz(20);
   toast(S.open ? '🟢 Mercado aberto! Os clientes vão chegar.' : '🔴 Mercado fechado. Quem já entrou termina as compras.');
   if (S.open) spawnT = Math.min(spawnT, 1.5);
-  save();
+  saveNow();
 });
 
 function initWorld() {
-  buildOpenSign();
+  buildOpenSign(); buildCartRack();
   buildWorld();
   for (const s of stations) { buildStation(s); if (!START.includes(s.id)) buildPad(s); }
 }
@@ -1218,8 +1316,7 @@ function sync(dt) {
   }
   for (const c of customers) {
     if (!c.pp) { c.pp = buildPerson(c.look); c.pp.g.scale.setScalar(.95); c.pp.g.rotation.y = Math.PI / 2; }
-    animPerson(c, dt, c.have > 0);
-    if (c.have) drawStack(c, Array(Math.min(c.have, 6)).fill(c.item));
+    animPerson(c, dt, true); syncCart(c, dt);
   }
   for (const h of helpers) { if (!h.pp) h.pp = buildPerson(h.look); animPerson(h, dt, h.stack.length > 0); drawStack(h, h.stack); }
   if (cashier) { if (!cashier.pp) cashier.pp = buildPerson(cashier.look); animPerson(cashier, dt, false); }
@@ -1233,6 +1330,7 @@ function sync(dt) {
   const onStand = dist(player, REG_STAND) < 0.8; standG.visible = !S.cashier;
   for (const m of standM) m.material = mat(onStand ? 0x2f9e5b : 0xffffff);
   openSign.rotation.z = Math.sin(time * 1.7) * 0.03;
+  const freeCarts = Math.max(1, 4 - Math.floor(customers.length / 3)); rackCarts.forEach((g, i) => { g.visible = i < freeCarts; });
   curObj = objective(); arrowOn = false;
   if (curObj && curObj.p) {
     const tall = curObj.p.kind === 'shelf' || curObj.p.look === 'tree' ? 2.4 : curObj.p.kind ? 1.9 : 1.6;
@@ -1260,7 +1358,13 @@ function bubble(x, y, draw, w) {
 }
 function drawBubble(c) {
   const a = proj(c.x, 1.55, c.y); if (a.z > 1) return;
-  if (c.state === 'shop' || c.state === 'in') bubble(a.x, a.y, (x, y) => { drawE(P[c.item].e, x - U * .27, y, U * .36); txt(`${c.have}/${c.want}`, x + U * .22, y, U * .25, '#1f2a22', null, 900); }, U * 1.25);
+  if (c.state === 'shop' || c.state === 'in') {
+    const it = c.list[Math.min(c.li, c.list.length - 1)], n = c.list.length;
+    bubble(a.x, a.y, (x, y) => {
+      drawE(P[it.item].e, x - U * (n > 1 ? .48 : .27), y, U * .34); txt(`${it.have}/${it.want}`, x - U * (n > 1 ? .05 : -.2), y, U * .24, '#1f2a22', null, 900);
+      if (n > 1) { rr(x + U * .2, y - U * .17, U * .5, U * .34, U * .17, '#f7a1c4'); txt(`${c.li + 1}/${n}`, x + U * .45, y + 1, U * .2, '#fff', null, 900); }
+    }, U * (n > 1 ? 1.55 : 1.2));
+  }
   else if (c.state === 'queue' && queue[0] === c && !staffed()) bubble(a.x, a.y, (x, y) => drawE('💲', x, y, U * .34), U * .7);
   else if (c.state === 'out' && c.angry && !c.happy) bubble(a.x, a.y, (x, y) => drawE('😠', x, y, U * .36), U * .7);
   else if (c.state === 'out' && c.happy && dist(c, DOOR_IN) > 0.3) bubble(a.x, a.y, (x, y) => drawE('😊', x, y, U * .36), U * .7);
@@ -1344,13 +1448,15 @@ function buy(id) {
   if (id === 'cashier') { S.cashier = true; addCashier(); toast('🧑‍💼 Caixa contratado!'); }
   else if (id === 'stocker') { addHelper(S.stockers); S.stockers++; toast('👷 Repositor contratado!'); }
   else S.up[id]++;
-  sfx('buy'); buzz(20); renderPanel(); save();
+  sfx('buy'); buzz(20); renderPanel(); saveNow();
 }
 $('#upBody').addEventListener('click', e => { const b = e.target.closest('[data-buy]'); if (b && !b.disabled) buy(b.dataset.buy); });
 function openSheet(id) { unlockAudio(); joy.on = false; $(id).hidden = false; }
 $('#btnUp').addEventListener('click', () => { renderPanel(); openSheet('#upScrim'); });
 $('#btnSet').addEventListener('click', () => {
   $('#optSound').checked = S.sound; $('#optVib').checked = S.vib;
+  $('#stSaveWhere').textContent = cloud ? (cloudLastOk ? 'Sua conta Claude + aparelho' : 'Neste aparelho (conta: conectando…)') : 'Neste aparelho';
+  const ago = Math.max(0, Math.round((Date.now() - lastSaved) / 1000)); $('#stSaveWhen').textContent = ago < 5 ? 'agora mesmo' : `há ${ago} s`;
   $('#stEarned').textContent = '$' + fmt(S.earned); $('#stServed').textContent = fmt(S.served);
   $('#stAreas').textContent = `${stations.filter(s => s.unlocked).length - START.length} de ${stations.length - START.length}`;
   openSheet('#setScrim');
@@ -1413,7 +1519,7 @@ $('#lookScrim').addEventListener('click', e => {
     for (const [k] of editTargets()) if (k !== 'player') { Object.assign(lookOf(k), { shirt: l.shirt, pants: l.pants, hat: l.hat, hatColor: l.hatColor }); rebuild(objOf(k)); }
     toast('👕 Uniforme aplicado na equipe!'); sfx('buy');
   } else return;
-  rebuild(objOf(editKey)); renderLook(); save();
+  rebuild(objOf(editKey)); renderLook(); saveNow();
 });
 $('#btnLook').addEventListener('click', () => { openSheet('#lookScrim'); renderLook(); });
 
@@ -1421,25 +1527,34 @@ let resetArmed = 0;
 $('#btnReset').addEventListener('click', e => {
   const b = e.currentTarget;
   if (Date.now() - resetArmed > 4000) { resetArmed = Date.now(); b.textContent = 'Toque de novo para apagar tudo'; setTimeout(() => { b.textContent = 'Recomeçar do zero'; }, 4000); return; }
-  resetting = true; try { localStorage.removeItem(KEY); } catch (err) {} location.reload();
+  resetting = true; try { localStorage.removeItem(KEY); } catch (err) {}
+  const done = () => location.reload();
+  if (cloud) cloud.ref.delete().then(done, done); else done();
 });
 let resetting = false;
 document.addEventListener('visibilitychange', () => { if (document.hidden && !resetting) save(); });
 addEventListener('pagehide', () => { if (!resetting) save(); });
 
 /* ---------- Main loop ---------- */
-resize(); load(); initWorld(); updateOpenUI(); shownMoney = S.money;
-camT.set(player.x, 0, player.y); updateCam(1);
 let last = performance.now(), saveT = 0, panelT = 0;
+async function boot() {
+  resize();
+  const cd = await cloudLoad();
+  load(cd); initWorld(); updateOpenUI(); shownMoney = S.money;
+  camT.set(player.x, 0, player.y); updateCam(1);
+  $('#boot').hidden = true; last = performance.now();
+  requestAnimationFrame(frame);
+  save();
+}
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
   update(dt); sync(dt); renderer.render(scene, camera); drawOverlay(); updateHud(dt);
-  if ((saveT += dt) > 4) { saveT = 0; if (!resetting) save(); }
+  if ((saveT += dt) > 3) { saveT = 0; if (!resetting) save(); }
   if (!$('#upScrim').hidden && (panelT += dt) > 0.3) { panelT = 0; refreshPanel(); }
   if (!$('#lookScrim').hidden) renderPreview(dt);
   requestAnimationFrame(frame);
 }
-requestAnimationFrame(frame);
+boot();
 if ('serviceWorker' in navigator && location.protocol.startsWith('http') && window.top === window.self) navigator.serviceWorker.register('sw.js').catch(() => {});
 </script>
 </body>

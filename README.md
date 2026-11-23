@@ -69,7 +69,8 @@ instalado na tela inicial (funciona sem internet depois da primeira visita).
 
 - **Como jogar:** arraste o dedo em qualquer lugar da tela para andar (no computador, use WASD ou as setas).
 - **Fazenda:** passe pelas plantações, galinheiro, curral e pomar para colher os produtos (eles vão para a sua pilha).
-- **Loja:** encoste nas prateleiras para abastecê-las. Os clientes pegam o que querem e vão para a fila.
+- **Loja:** encoste nas prateleiras para abastecê-las. Os clientes chegam com carrinho e uma lista de compras
+  (até 3 produtos diferentes), passam em cada prateleira e depois vão para a fila do caixa.
 - **Colisão:** ninguém atravessa balcão, prateleiras, máquina, galinheiro ou curral; clientes e funcionários andam pelos corredores.
 - **Caixa:** fique no quadrado ao lado do caixa para atender; depois pegue o dinheiro que fica no balcão.
 - **Expandir:** pare em cima das placas verdes para comprar novas áreas (milho, ovos, leite, maçã, máquina de suco...).
@@ -80,4 +81,5 @@ instalado na tela inicial (funciona sem internet depois da primeira visita).
 - **Melhorias (🛠️):** mochila maior, tênis, adubo, prateleiras maiores, fama, preços premium,
   e contratar **caixa** e **repositores** que trabalham sozinhos.
 
-O progresso fica salvo no próprio aparelho. Publicado junto com a pasta `web/`, o jogo fica em `…/mercadinho/`.
+O jogo salva sozinho a cada poucos segundos e logo depois de cada compra, contratação ou mudança de visual
+(no próprio aparelho; na versão publicada no claude.ai, também na sua conta). Publicado junto com a pasta `web/`, o jogo fica em `…/mercadinho/`.
