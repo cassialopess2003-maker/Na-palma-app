@@ -68,7 +68,9 @@ Um jogo casual de mercadinho em **3D estilo cartoon** (paleta Pastel Doce) (Thre
 instalado na tela inicial (funciona sem internet depois da primeira visita).
 
 - **Como jogar:** arraste o dedo em qualquer lugar da tela para andar (no computador, use WASD ou as setas).
-- **Fazenda:** passe pelas plantações, galinheiro, curral e pomar para colher os produtos (eles vão para a sua pilha).
+- **Fazenda:** passe por cima de cada produto (pé de tomate, espiga, ovo, garrafa de leite, maçã) para pegá-lo; só vem o que você pisar.
+- **Galinhas:** só botam ovos se tiverem comida. Leve milho ao comedouro do galinheiro (1 milho = 2 ovos, cabem 6).
+- **Lixeira:** perto da saída da loja; encoste nela para jogar fora o que sobrou nas mãos.
 - **Loja:** encoste nas prateleiras para abastecê-las. Os clientes chegam com carrinho e uma lista de compras
   (até 3 produtos diferentes), passam em cada prateleira e depois vão para a fila do caixa.
 - **Colisão:** ninguém atravessa balcão, prateleiras, máquina, galinheiro ou curral; clientes e funcionários andam pelos corredores.
