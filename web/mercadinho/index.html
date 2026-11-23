@@ -347,7 +347,7 @@ const helperSpeed = () => 2.8 * (1 + 0.12 * S.up.train);
 const PLOT_CAP = 6, M_IN = 10, M_OUT = 8;
 const capOf = s => s.kind === 'shelf' ? shelfCap() : s.kind === 'machine' ? M_OUT : PLOT_CAP;
 
-const TRASH = { x: 9.65, y: 10.25 };
+const TRASH = { x: 9.65, y: 9.55 };
 let trashOpen = 0;
 const REG_STAND = { x: 2.4, y: 5.55 }, CASH = { x: 4.15, y: 6.6 }, DOOR_IN = { x: 0.8, y: 9.3 }, DOOR_OUT = { x: -1.6, y: 9.3 }, GAP = { x: 7.5, y: 11 };
 const WALLS = [{ x: -0.15, y: -0.3, w: 0.3, h: 8.85 }, { x: -0.15, y: 10.05, w: 0.3, h: 1.1 },
@@ -1316,10 +1316,15 @@ $('#btnOpen').addEventListener('click', () => {
 let trashLid = null;
 function buildTrash() {
   const g = new THREE.Group(); g.position.set(TRASH.x, 0, TRASH.y); scene.add(g);
-  part(g, 'cyl', 0x7fd6b0, [.5, .62, .5], [0, .31, 0], { line: .03 }); part(g, 'cyl', 0xffffff, [.515, .1, .515], [0, .4, 0]);
-  const icon = new THREE.Mesh(GEO.plane, new THREE.MeshBasicMaterial({ transparent: true, map: canvasTex(96, 96, (c, w, h) => {
-    c.fillStyle = '#2f9e5b'; c.font = '900 76px system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('♻', w / 2, h / 2 + 4); }) }));
-  icon.scale.set(.22, .22, 1); icon.position.set(0, .4, .262); g.add(icon);
+  part(g, 'cyl', 0x7fd6b0, [.5, .62, .5], [0, .31, 0], { line: .03 });
+  // Label wrapped around the front of the bin (curved, so it reads straight from the camera)
+  const lbl = canvasTex(256, 64, (c, w, h) => {
+    c.fillStyle = '#ffffff'; c.fillRect(0, 0, w, h);
+    c.fillStyle = '#2f7d5b'; c.font = '900 46px ui-rounded,system-ui,sans-serif'; c.textAlign = 'center'; c.textBaseline = 'middle'; c.fillText('LIXO', w / 2, h / 2 + 2);
+  });
+  lbl.wrapS = lbl.wrapT = THREE.ClampToEdgeWrapping; lbl.repeat.set(1, 1);
+  const band = new THREE.Mesh(new THREE.CylinderGeometry(.258, .258, .15, 24, 1, true, -1.15, 2.3), new THREE.MeshBasicMaterial({ map: lbl }));
+  band.position.y = .38; g.add(band);
   trashLid = new THREE.Group(); trashLid.position.set(0, .63, -.25); g.add(trashLid);
   part(trashLid, 'cyl', 0x5fbf98, [.56, .06, .56], [0, 0, .25], { line: .025 }); part(trashLid, 'box', 0x3f9b7a, [.18, .05, .06], [0, .05, .25]);
 }
@@ -1363,7 +1368,7 @@ function syncStation(s) {
     s.feedM.visible = fed; s.feedM.scale.y = .02 + .06 * f; s.feedM.position.y = .23 + .03 * f;
     s.anim.forEach((c, i) => {
       if (fed) { // pecking at the feeder
-        const ph = time * (i ? .7 : .9) + s.x + i * 2; c.position.x = (i ? .3 : -.35) + Math.sin(ph) * .15; c.position.z = .02; c.rotation.y = Math.PI;
+        const ph = time * (i ? .7 : .9) + s.x + i * 2; c.position.x = (i ? .3 : -.35) + Math.sin(ph) * .15; c.position.z = -.05; c.rotation.y = 0; // facing the trough (+z)
         c.rotation.x = Math.max(0, Math.sin(time * 9 + i * 2)) * .5; c.position.y = .08;
       } else { c.position.set(i ? .6 : -.65, .08, -.05); c.rotation.set(0, i ? -.4 : .4, 0); }
     });
