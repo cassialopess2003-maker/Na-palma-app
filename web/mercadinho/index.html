@@ -376,6 +376,7 @@ function load() {
     }
   }
   for (const id of START) byId[id].unlocked = true;
+  rebuildSolids();
   S.looks = S.looks || {};
   S.looks.player = normLook(S.looks.player || { shirt: '#f78fb3', skin: '#f1c27d', hair: '#5a3825', hat: 'bone', hatColor: '#b5a8f0', pants: '#6b4f6e' });
   S.looks.stockers = S.looks.stockers || [];
@@ -449,12 +450,60 @@ function near(s, o, pad) {
   return dx * dx + dy * dy <= pad * pad;
 }
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-function collide(o, r) {
-  for (const w of WALLS) {
-    const cx = clamp(o.x, w.x, w.x + w.w), cy = clamp(o.y, w.y, w.y + w.h);
-    let dx = o.x - cx, dy = o.y - cy; const d2 = dx * dx + dy * dy;
-    if (d2 < r * r) { let d = Math.sqrt(d2); if (d < 1e-4) { dx = 0; dy = o.y < w.y + w.h / 2 ? -1 : 1; d = 1; } o.x = cx + dx / d * r; o.y = cy + dy / d * r; }
+// Solid things nobody walks through: walls plus counters, shelves, machine, coop house, cow pen and tree trunks.
+let SOLIDS = WALLS.slice();
+const box = (x, y, w, h) => ({ x: x - w / 2, y: y - h / 2, w, h });
+function rebuildSolids() {
+  SOLIDS = WALLS.slice();
+  for (const s of stations) {
+    if (!s.unlocked) continue;
+    if (s.kind === 'register' || s.kind === 'shelf') SOLIDS.push(box(s.x, s.y, s.w, s.h));
+    else if (s.kind === 'machine') SOLIDS.push(box(s.x, s.y - .3, 2.0, 1.0));
+    else if (s.look === 'coop') SOLIDS.push(box(s.x, s.y - .65, 1.7, .9));
+    else if (s.look === 'barn') SOLIDS.push(box(s.x, s.y, s.w, s.h));
+    else if (s.look === 'tree') SOLIDS.push(box(s.x, s.y, .4, .4));
   }
+}
+function pushOut(o, r, w) {
+  const cx = clamp(o.x, w.x, w.x + w.w), cy = clamp(o.y, w.y, w.y + w.h);
+  const dx = o.x - cx, dy = o.y - cy, d2 = dx * dx + dy * dy;
+  if (d2 === 0) { // inside: leave by the nearest side
+    const l = o.x - w.x, rt = w.x + w.w - o.x, t = o.y - w.y, b = w.y + w.h - o.y, m = Math.min(l, rt, t, b);
+    if (m === l) o.x = w.x - r; else if (m === rt) o.x = w.x + w.w + r; else if (m === t) o.y = w.y - r; else o.y = w.y + w.h + r;
+  } else if (d2 < r * r) { const d = Math.sqrt(d2); o.x = cx + dx / d * r; o.y = cy + dy / d * r; }
+}
+function collide(o, r) { for (let k = 0; k < 2; k++) for (const w of SOLIDS) pushOut(o, r, w); }
+// Does the segment a-b pass through rectangle w (grown by pad)?
+function segHits(a, b, w, pad) {
+  let t0 = 0, t1 = 1; const dx = b.x - a.x, dy = b.y - a.y;
+  for (const [p, q] of [[-dx, a.x - (w.x - pad)], [dx, w.x + w.w + pad - a.x], [-dy, a.y - (w.y - pad)], [dy, w.y + w.h + pad - a.y]]) {
+    if (p === 0) { if (q < 0) return false; }
+    else { const t = q / p; if (p < 0) { if (t > t1) return false; if (t > t0) t0 = t; } else { if (t < t0) return false; if (t < t1) t1 = t; } }
+  }
+  return true;
+}
+const clearLine = (a, b) => !SOLIDS.some(w => segHits(a, b, w, .22));
+// Walkways: vertical aisles in the shop, dirt roads in the farm.
+const AISLES = [4.0, 7.6, 10.8, 14.4], ROADS = [12.35, 16.4, 20.25], FARM_X = 7.5;
+function storeLeg(a, b) {
+  if (clearLine(a, b)) return [{ x: b.x, y: b.y }];
+  let best = null;
+  for (const A of AISLES) {
+    const p = [{ x: A, y: a.y }, { x: A, y: b.y }, { x: b.x, y: b.y }];
+    const ok = clearLine(a, p[0]) && clearLine(p[0], p[1]) && clearLine(p[1], p[2]);
+    const c = Math.abs(A - a.x) + Math.abs(A - b.x) + (ok ? 0 : 100);
+    if (!best || c < best.c) best = { c, p };
+  }
+  return best.p;
+}
+function farmLeg(a, b) {
+  if (clearLine(a, b)) return [{ x: b.x, y: b.y }];
+  const road = p => ROADS.reduce((m, r) => r <= p.y + .01 ? r : m, ROADS[0]);
+  const ra = road(a), rb = road(b);
+  // Leave/reach the road straight up/down when that is clear, otherwise go round by the central path.
+  const start = clearLine(a, { x: a.x, y: ra }) ? [{ x: a.x, y: ra }, { x: FARM_X, y: ra }] : [{ x: FARM_X, y: a.y }, { x: FARM_X, y: ra }];
+  const end = clearLine({ x: b.x, y: rb }, b) ? [{ x: FARM_X, y: rb }, { x: b.x, y: rb }, { x: b.x, y: b.y }] : [{ x: FARM_X, y: rb }, { x: FARM_X, y: b.y }, { x: b.x, y: b.y }];
+  return [...start, ...end];
 }
 function walk(o, tx, ty, sp, dt) {
   const dx = tx - o.x, dy = ty - o.y, d = Math.hypot(dx, dy);
@@ -468,7 +517,13 @@ function followPath(o, sp, dt) {
   const p = o.path[0]; if (walk(o, p.x, p.y, sp, dt)) o.path.shift();
   return o.path.length === 0;
 }
-function route(o, p) { const path = []; if ((o.y < STORE_H) !== (p.y < STORE_H)) path.push({ x: GAP.x + rnd(-0.5, 0.5), y: GAP.y }); path.push(p); return path; }
+function route(o, p) {
+  const a = { x: o.x, y: o.y }, inA = a.y < STORE_H, inB = p.y < STORE_H, door = { x: FARM_X, y: 10.4 }, yard = { x: FARM_X + rnd(-.3, .3), y: 11.7 };
+  if (inA && inB) return storeLeg(a, p);
+  if (!inA && !inB) return farmLeg(a, p);
+  if (inA) return [...storeLeg(a, door), yard, ...farmLeg(yard, p)];
+  return [...farmLeg(a, yard), door, ...storeLeg(door, p)];
+}
 const sinkItem = s => s.kind === 'shelf' ? s.item : s.inItem;
 const isSink = s => s.unlocked && (s.kind === 'shelf' || s.kind === 'machine');
 const sinkSpace = s => s.kind === 'shelf' ? shelfCap() - s.stock : M_IN - s.input;
@@ -563,7 +618,7 @@ function updatePlayer(dt) {
   if (cash.amount > 0 && dist(player, CASH) < 1.0) collectCash();
 }
 function unlock(s) {
-  s.unlocked = true; s.paid = s.cost; s.bump = 1.5;
+  s.unlocked = true; s.paid = s.cost; s.bump = 1.5; rebuildSolids();
   for (let i = 0; i < 50; i++) confetti.push({ x: s.x, z: s.y, h: .5, vx: rnd(-3, 3), vz: rnd(-3, 3), vh: rnd(4, 9), t: 0, c: pick(['#ffd43b', '#ff6b6b', '#4dabf7', '#69db7c', '#f783ac']) });
   sfx('unlock'); buzz(40); toast(`🎉 ${label(s)} liberado!`);
   if (S.tut === 4) setTut(5);
@@ -586,10 +641,11 @@ function spawnCustomer(shelves) {
   const spot = (sh.spotN++) % 3;
   const c = { x: DOOR_OUT.x, y: DOOR_OUT.y + rnd(-0.2, 0.2), look: randLook(), item: sh.item, shelf: sh,
     want: 1 + Math.floor(Math.random() * maxWant), have: 0, state: 'in', pat: 0, tk: 0, dir: { x: 1, y: 0 }, moving: false, walkT: rnd(0, 3),
-    path: [{ x: DOOR_IN.x, y: DOOR_IN.y }, { x: sh.x + (spot - 1) * 0.78 + rnd(-0.1, 0.1), y: sh.y + 0.95 }] };
+    path: [{ x: DOOR_IN.x, y: DOOR_IN.y }, ...storeLeg(DOOR_IN, { x: sh.x + (spot - 1) * 0.78 + rnd(-0.1, 0.1), y: sh.y + 0.95 })] };
   customers.push(c);
 }
-function leave(c) { c.state = 'out'; c.path = [{ x: DOOR_IN.x, y: DOOR_IN.y }, { x: DOOR_OUT.x, y: DOOR_OUT.y }]; }
+function leave(c) { c.state = 'out'; c.path = [...storeLeg(c, DOOR_IN), { x: DOOR_OUT.x, y: DOOR_OUT.y }]; }
+function toQueue(c) { c.state = 'queue'; queue.push(c); c.path = storeLeg(c, { x: 3.9, y: 8.4 }); }
 function updCustomer(c, dt) {
   const CS = 2.3;
   if (c.state === 'in') { if (followPath(c, CS, dt)) c.state = 'shop'; }
@@ -598,10 +654,10 @@ function updCustomer(c, dt) {
     c.tk -= dt; c.dir = { x: 0, y: -1 };
     const sh = c.shelf;
     if (sh.stock > 0 && c.tk <= 0) { sh.stock--; c.have++; c.tk = 0.35; sh.bump = 0.6; fly(c.item, sh.x + rnd(-0.8, 0.8), sh.y, 0.6, c.x, c.y, 0.9, 0.22); }
-    if (c.have >= c.want) { c.state = 'queue'; queue.push(c); }
-    else if (c.pat > 40) { c.angry = true; if (c.have > 0) { c.state = 'queue'; queue.push(c); } else leave(c); }
+    if (c.have >= c.want) toQueue(c);
+    else if (c.pat > 40) { c.angry = true; if (c.have > 0) toQueue(c); else leave(c); }
   } else if (c.state === 'queue') {
-    const q = qslot(queue.indexOf(c)); walk(c, q.x, q.y, CS, dt);
+    if (c.path.length) followPath(c, CS, dt); else { const q = qslot(queue.indexOf(c)); walk(c, q.x, q.y, CS, dt); }
     if (!c.moving) c.dir = { x: 0, y: -1 };
   } else if (c.state === 'out') { if (followPath(c, CS, dt)) c.dead = true; }
 }
@@ -635,7 +691,7 @@ function addHelper(i) {
     look: S.looks.stockers[i] = normLook(S.looks.stockers[i] || staffLook('#b5a8f0')) });
 }
 function addCashier() { cashier = { x: REG_STAND.x, y: REG_STAND.y, dir: { x: 0, y: 1 }, moving: false, walkT: 0, look: S.looks.cashier = normLook(S.looks.cashier || staffLook('#8fd3ff')) }; }
-const srcPoint = s => ({ x: s.x + rnd(-0.7, 0.7), y: s.y - s.h / 2 + 0.15 });
+const srcPoint = s => s.kind === 'machine' ? { x: s.x + rnd(-0.6, 0.6), y: s.y + s.h / 2 + 0.25 } : { x: s.x + rnd(-0.7, 0.7), y: s.y - s.h / 2 - 0.25 };
 const sinkPoint = s => s.kind === 'shelf' ? { x: s.x + rnd(-0.8, 0.8), y: s.y - 0.85 } : { x: s.x - 0.5 + rnd(-0.3, 0.3), y: s.y - s.h / 2 - 0.2 };
 function goSink(h, sk) { h.sink = sk || h.sink; h.state = 'toSink'; h.path = route(h, sinkPoint(h.sink)); }
 function planHelper(h) {
@@ -737,6 +793,7 @@ const gradTex = new THREE.DataTexture(new Uint8Array([105, 185, 235]), 3, 1, THR
 gradTex.minFilter = gradTex.magFilter = THREE.NearestFilter; gradTex.generateMipmaps = false; gradTex.needsUpdate = true;
 const matCache = new Map();
 function mat(c) { let m = matCache.get(c); if (!m) { m = new THREE.MeshToonMaterial({ color: c, gradientMap: gradTex }); matCache.set(c, m); } return m; }
+const SHINE = new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: .75 });
 const OUTLINE = new THREE.MeshBasicMaterial({ color: TH.outline, side: THREE.BackSide });
 const GEO = { box: new THREE.BoxGeometry(1, 1, 1), sph: new THREE.SphereGeometry(0.5, 18, 14), cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 18),
   cone: new THREE.ConeGeometry(0.5, 1, 14), ico: new THREE.IcosahedronGeometry(0.5, 1), plane: new THREE.PlaneGeometry(1, 1) };
@@ -754,23 +811,64 @@ function part(parent, geo, color, s, p, o = {}) {
 }
 
 /* ---------- Products (pooled, reused every frame) ---------- */
+// Corn kernels drawn as a texture so the cob reads as corn.
+const cornMat = new THREE.MeshToonMaterial({ gradientMap: gradTex, map: (() => {
+  const c = document.createElement('canvas'); c.width = 64; c.height = 128; const g = c.getContext('2d');
+  g.fillStyle = '#d99a00'; g.fillRect(0, 0, 64, 128);
+  for (let y = 0; y < 16; y++) for (let x = 0; x < 8; x++) { g.fillStyle = (x + y) % 3 ? '#ffd23f' : '#ffe27a'; g.beginPath(); g.roundRect(x * 8 + (y % 2) * 4 - 3, y * 8 + 1, 7, 6.5, 3); g.fill(); }
+  const t = new THREE.CanvasTexture(c); t.wrapS = THREE.RepeatWrapping; t.repeat.set(2, 1); return t; })() });
+GEO.taper = new THREE.CylinderGeometry(0.28, 0.5, 1, 18);
+GEO.leaf = new THREE.SphereGeometry(0.5, 10, 8);
 const PH = { tomate: 0.22, milho: 0.17, ovo: 0.23, leite: 0.32, maca: 0.25, suco: 0.3, nota: 0.06 };
 function buildProduct(k) {
   const g = new THREE.Group(), L = 0.022, o = x => Object.assign({ cast: false }, x || {});
   switch (k) {
-    case 'tomate': part(g, 'sph', 0xe8402f, [.26, .22, .26], [0, .11, 0], o({ line: L })); part(g, 'cone', 0x3f9b3a, [.15, .07, .15], [0, .23, 0], o()); break;
-    case 'milho': part(g, 'cyl', 0xffcf33, [.13, .3, .13], [-.02, .085, 0], o({ rot: [0, 0, Math.PI / 2], line: L })); part(g, 'cone', 0x5fae3a, [.15, .16, .15], [.17, .085, 0], o({ rot: [0, 0, -Math.PI / 2] })); break;
-    case 'ovo': part(g, 'sph', 0xfff3dc, [.18, .23, .18], [0, .115, 0], o({ line: L })); break;
-    case 'leite': part(g, 'cyl', 0xffffff, [.16, .26, .16], [0, .13, 0], o({ line: L })); part(g, 'cyl', 0x3d8bfd, [.166, .08, .166], [0, .13, 0], o()); part(g, 'cyl', 0x3d8bfd, [.09, .06, .09], [0, .29, 0], o()); break;
-    case 'maca': part(g, 'sph', 0xd62828, [.25, .23, .25], [0, .115, 0], o({ line: L })); part(g, 'cyl', 0x6b3f1d, [.025, .08, .025], [0, .26, 0], o()); part(g, 'sph', 0x4cb043, [.09, .03, .05], [.05, .26, 0], o()); break;
-    case 'suco': part(g, 'box', 0xff9f1c, [.18, .26, .12], [0, .13, 0], o({ line: L })); part(g, 'box', 0xffffff, [.186, .08, .126], [0, .15, 0], o()); part(g, 'cyl', 0xffffff, [.022, .12, .022], [.045, .31, 0], o()); break;
+    case 'tomate': {
+      part(g, 'sph', 0xe8402f, [.27, .22, .27], [0, .11, 0], o({ line: L }));
+      for (let i = 0; i < 5; i++) { const r = new THREE.Group(); r.rotation.y = i * 1.2566; r.position.y = .215; g.add(r); part(r, 'leaf', 0x3f9b3a, [.045, .02, .13], [0, 0, .05], o({ rot: [-.25, 0, 0] })); }
+      part(g, 'cyl', 0x3f8a2a, [.03, .06, .03], [0, .245, 0], o());
+      part(g, 'sph', 0xffffff, [.06, .035, .03], [-.065, .165, .1], o({ rot: [0, -.6, .4], mat: SHINE }));
+      break; }
+    case 'milho': {
+      // Cob lying down: kernel texture, pointed tip, three husk leaves peeling back and a short stalk.
+      const c = new THREE.Group(); c.rotation.z = Math.PI / 2; c.position.y = .085; g.add(c);
+      part(c, 'sph', 0, [.165, .42, .165], [0, .03, 0], o({ mat: cornMat, line: L }));
+      for (let i = 0; i < 3; i++) {
+        const r = new THREE.Group(); r.rotation.y = i * 2.094 + .4; c.add(r);
+        part(r, 'leaf', i ? 0x7cc44a : 0x5fae3a, [.11, .34, .035], [0, -.1, .075], o({ rot: [.38, 0, 0], line: .012 }));
+      }
+      part(c, 'cyl', 0x8fbf4a, [.06, .09, .06], [0, -.22, 0], o());
+      break; }
+    case 'ovo': part(g, 'sph', 0xfff3dc, [.18, .23, .18], [0, .115, 0], o({ line: L })); part(g, 'sph', 0xffffff, [.04, .06, .02], [-.04, .15, .08], o({ mat: SHINE })); break;
+    case 'leite': {
+      // Glass milk bottle: body, shoulder, neck, blue cap and a label with a cow spot.
+      part(g, 'cyl', 0xffffff, [.17, .17, .17], [0, .085, 0], o({ line: L }));
+      part(g, 'taper', 0xffffff, [.17, .08, .17], [0, .21, 0], o({ line: L }));
+      part(g, 'cyl', 0xffffff, [.09, .05, .09], [0, .27, 0], o({ line: L }));
+      part(g, 'cyl', 0x3d8bfd, [.1, .035, .1], [0, .305, 0], o());
+      part(g, 'cyl', 0x8fd3ff, [.174, .07, .174], [0, .1, 0], o());
+      part(g, 'sph', 0x2b2b2b, [.04, .03, .01], [.02, .1, .087], o());
+      break; }
+    case 'maca':
+      part(g, 'sph', 0xd62828, [.25, .22, .25], [0, .11, 0], o({ line: L })); part(g, 'sph', 0xb51f2a, [.07, .03, .07], [0, .215, 0], o());
+      part(g, 'cyl', 0x6b3f1d, [.022, .09, .022], [.005, .25, 0], o({ rot: [0, 0, -.2] }));
+      part(g, 'leaf', 0x4cb043, [.1, .025, .055], [.06, .265, 0], o({ rot: [0, .4, -.35], line: .01 }));
+      part(g, 'sph', 0xffffff, [.05, .04, .025], [-.06, .16, .095], o({ rot: [0, -.6, .4], mat: SHINE }));
+      break;
+    case 'suco':
+      part(g, 'box', 0xff9f1c, [.18, .26, .12], [0, .13, 0], o({ line: L }));
+      part(g, 'box', 0xffe8cc, [.12, .025, .08], [0, .27, 0], o());
+      part(g, 'cyl', 0xd62828, [.09, .01, .09], [0, .13, .061], o({ rot: [Math.PI / 2, 0, 0] }));
+      part(g, 'leaf', 0x4cb043, [.05, .02, .03], [.035, .18, .062], o({ rot: [Math.PI / 2, 0, .5] }));
+      part(g, 'cyl', 0xf78fb3, [.022, .14, .022], [.045, .33, 0], o({ rot: [0, 0, -.25] }));
+      break;
     case 'nota': part(g, 'box', 0x5fbf5f, [.36, .05, .2], [0, .025, 0], o({ line: .015 })); part(g, 'cyl', 0x2e7d32, [.07, .054, .07], [0, .026, 0], o()); break;
   }
   return g;
 }
 const pool = {};
 function item(k) { const p = pool[k] || (pool[k] = { list: [], n: 0 }); let m = p.list[p.n]; if (!m) { m = buildProduct(k); scene.add(m); p.list.push(m); } p.n++; m.visible = true; return m; }
-function putItem(k, x, h, z, s = 1, ry = 0) { const m = item(k); m.position.set(x, h, z); m.scale.setScalar(s); m.rotation.set(0, ry, 0); return m; }
+function putItem(k, x, h, z, s = 1, ry = 0, rz = 0) { const m = item(k); m.position.set(x, h, z); m.scale.setScalar(s); m.rotation.set(0, ry, rz); return m; }
 function poolBegin() { for (const k in pool) pool[k].n = 0; }
 function poolEnd() { for (const k in pool) { const p = pool[k]; for (let i = p.n; i < p.list.length; i++) p.list[i].visible = false; } }
 
@@ -806,9 +904,12 @@ function buildPerson(look, parent = scene) {
     part(head, 'sph', hc, [.07, .07, .07], [.16, .18, .07]);
   }
   for (const sd of [-1, 1]) {
-    part(head, 'sph', 0x241812, [.06, .085, .04], [sd * .09, 0, .205], { cast: false });
+    part(head, 'sph', 0x241812, [.065, .09, .04], [sd * .09, 0, .205], { cast: false });
+    part(head, 'sph', 0xffffff, [.022, .026, .01], [sd * .09 - .015, .022, .224], { cast: false, mat: SHINE });
     part(head, 'sph', 0xff9e9e, [.07, .035, .02], [sd * .14, -.07, .19], { cast: false });
   }
+  part(head, 'sph', look.skin, [.07, .055, .05], [0, -.04, .22], { cast: false, line: .008 });
+  part(head, 'sph', 0x8a3b3b, [.08, .025, .02], [0, -.11, .2], { cast: false });
   parent.add(g);
   return { g, legs, arms, body };
 }
@@ -859,16 +960,29 @@ function buildCow() {
 /* ---------- Stations ---------- */
 const PLANT_SPOTS = [[-0.8, -0.55], [0, -0.55], [0.8, -0.55], [-0.8, 0.5], [0, 0.5], [0.8, 0.5]];
 const APPLE_SPOTS = [[-.55, 1.75, .78], [0, 2.35, .75], [.55, 1.75, .78], [-.3, 1.3, .85], [.35, 1.3, .85], [0, 1.8, .97]];
+// Little sign on top of each shelf: product picture and name.
+function labelMat(k) {
+  return new THREE.MeshBasicMaterial({ map: canvasTex(256, 74, (g, w, h) => {
+    g.fillStyle = '#fff7fb'; g.beginPath(); g.roundRect(3, 3, w - 6, h - 6, 16); g.fill();
+    g.font = '44px "Apple Color Emoji","Segoe UI Emoji","Noto Color Emoji",sans-serif'; g.textBaseline = 'middle'; g.textAlign = 'left'; g.fillText(P[k].e, 14, h / 2 + 3);
+    g.fillStyle = '#6b4f6e'; g.font = '900 34px ui-rounded,system-ui,sans-serif'; g.fillText(P[k].n, 72, h / 2 + 2); }) });
+}
 function buildStation(s) {
   const g = new THREE.Group(); g.position.set(s.x, 0, s.y); scene.add(g); s.g = g; const w = s.w, h = s.h;
   if (s.look === 'field') {
     part(g, 'box', TH.soil[0], [w, .16, h], [0, .08, 0], { line: .03 }); part(g, 'box', TH.soil[1], [w - .15, .04, h - .15], [0, .17, 0]);
     for (const dz of [-.55, .5]) part(g, 'box', TH.soil[2], [w - .3, .07, .55], [0, .2, dz]);
-    const c = s.item === 'milho' ? 0x5fae3a : 0x3f9b3a;
     s.sprouts = PLANT_SPOTS.map(([dx, dz]) => {
       const sp = new THREE.Group(); sp.position.set(dx, .22, dz); g.add(sp);
-      part(sp, 'sph', c, [.28, .1, .13], [-.1, .1, 0], { rot: [0, 0, .5] }); part(sp, 'sph', c, [.28, .1, .13], [.1, .1, 0], { rot: [0, 0, -.5] });
-      part(sp, 'cyl', 0x4cb043, [.04, .2, .04], [0, .1, 0]); return sp;
+      if (s.item === 'milho') { // tall stalk with long arching leaves and a tassel
+        part(sp, 'cyl', 0x6fb33f, [.05, .7, .05], [0, .35, 0], { line: .012 });
+        for (let k = 0; k < 4; k++) { const r = new THREE.Group(); r.rotation.y = k * 1.7; r.position.y = .15 + k * .12; sp.add(r); part(r, 'leaf', k % 2 ? 0x5fae3a : 0x7cc44a, [.07, .4, .02], [0, .1, .13], { rot: [.9, 0, 0] }); }
+        part(sp, 'cone', 0xe9c46a, [.08, .14, .08], [0, .76, 0]);
+      } else { // tomato bush tied to a stake
+        part(sp, 'cyl', 0xc49a6c, [.03, .62, .03], [-.12, .31, -.08]);
+        part(sp, 'ico', 0x3f9b3a, [.36, .3, .34], [0, .2, 0], { line: .015 }); part(sp, 'ico', 0x4cb043, [.26, .24, .26], [-.1, .36, -.04]); part(sp, 'ico', 0x358a33, [.24, .22, .24], [.12, .32, .02]);
+      }
+      return sp;
     });
   } else if (s.look === 'coop') {
     part(g, 'box', TH.straw, [w, .08, h], [0, .04, 0], { line: .03 });
@@ -908,6 +1022,9 @@ function buildStation(s) {
     for (const sd of [-1, 1]) part(g, 'box', wood, [.08, 1.1, h], [sd * (w / 2 - .04), .6, 0], { line: .03 });
     part(g, 'box', wood, [w - .12, .05, h - .04], [0, .38, 0]); part(g, 'box', wood, [w - .12, .05, h / 2], [0, .8, -h / 4]);
     part(g, 'box', fr ? 0x4dabf7 : 0xffffff, [w, .12, .1], [0, 1.18, -h / 2 + .05], { line: .02 });
+    const tag = new THREE.Mesh(GEO.plane, labelMat(s.item)); tag.scale.set(1.25, .36, 1); tag.position.set(0, 1.42, -h / 2 + .07); g.add(tag);
+    part(g, 'box', 0x6b4f6e, [1.32, .42, .04], [0, 1.42, -h / 2 + .04], { cast: false });
+    for (const y of [.42, .82]) part(g, 'box', fr ? 0xbfe3ff : 0xffe1ec, [w - .1, .07, .02], [0, y - .04, y < .5 ? h / 2 - .02 : .01]);
   } else if (s.kind === 'register') {
     part(g, 'box', TH.reg[0], [w, .78, h], [0, .39, 0], { line: .03 }); part(g, 'box', TH.reg[1], [w + .08, .06, h + .08], [0, .8, 0]);
     part(g, 'box', 0x455a64, [.5, .3, .4], [-.55, .98, -.1], { line: .02 }); part(g, 'box', 0xa5f3c2, [.38, .16, .03], [-.55, 1.02, .11]);
@@ -972,6 +1089,20 @@ function buildWorld() {
   for (let z = 1.5; z < H + 2; z += 3.4) decoTree(W + 1.6 + (z % 2), z, .9 + (z % 3) * .1);
   for (let x = 1; x < W + 2; x += 3.2) decoTree(x, H + 1.8 + (x % 2) * .5, 1);
   for (let x = -.5; x < W + 1; x += 2.1) part(scene, 'ico', TH.bush, [.9, .6, .7], [x + .5, .25, -.75], { line: .03 });
+  // Potted plants inside the shop
+  for (const [x, z] of [[.55, .55], [14.45, .55], [14.45, 10.3], [5.4, 10.3]]) {
+    part(scene, 'taper', 0xd98a6a, [.42, .4, .42], [x, .2, z], { line: .02, rot: [Math.PI, 0, 0] });
+    part(scene, 'ico', 0x4cb043, [.55, .5, .55], [x, .62, z], { line: .025 }); part(scene, 'ico', 0x5fae3a, [.32, .3, .32], [x + .12, .86, z - .05]);
+  }
+  // Flowers along the farm edges
+  const petals = [0xffffff, 0xf78fb3, 0xffd166, 0xb5a8f0];
+  let fi = 0;
+  for (let z = 12; z < H; z += .95) for (const x of [.3, W - .3]) {
+    const f = new THREE.Group(); f.position.set(x + Math.sin(z * 7) * .08, 0, z + Math.cos(z * 5 + x) * .15); scene.add(f);
+    part(f, 'cyl', 0x4cb043, [.025, .22, .025], [0, .11, 0], { cast: false });
+    for (let k = 0; k < 5; k++) part(f, 'sph', petals[fi % 4], [.07, .03, .07], [Math.cos(k * 1.256) * .05, .23, Math.sin(k * 1.256) * .05], { cast: false });
+    part(f, 'sph', 0xffd43b, [.05, .04, .05], [0, .24, 0], { cast: false }); fi++;
+  }
 }
 // Lights: soft sky light plus a sun with cartoon shadows that follows the camera.
 const hemi = new THREE.HemisphereLight(TH.hemi[0], TH.hemi[1], TH.hemi[2]); scene.add(hemi);
@@ -1041,7 +1172,11 @@ function syncStation(s) {
     const p = s.t / s.time;
     s.sprouts.forEach((sp, i) => {
       sp.scale.setScalar(i < st ? 1 : i === st ? .3 + .7 * p : .25);
-      if (i < st) { const [dx, dz] = PLANT_SPOTS[i]; putItem(s.item, s.x + dx, .36 + Math.sin(time * 3 + i) * .025, s.y + dz, 1.7, .3); }
+      if (i < st) {
+        const [dx, dz] = PLANT_SPOTS[i], b = Math.sin(time * 3 + i) * .02;
+        if (s.item === 'milho') putItem('milho', s.x + dx + .14, .6 + b, s.y + dz + .06, 1.5, .4, 1.25);
+        else { putItem('tomate', s.x + dx + .1, .42 + b, s.y + dz + .2, 1.35); putItem('tomate', s.x + dx - .14, .55 + b, s.y + dz + .12, 1.1); }
+      }
     });
   } else if (s.look === 'coop') {
     for (let i = 0; i < st; i++) putItem('ovo', s.x + (i - 2.5) * .3, .16, s.y + .85, 1.2);
@@ -1139,7 +1274,7 @@ function drawOverlay() {
   }
   for (const s of stations) {
     if (!s.unlocked) continue;
-    if (s.kind === 'shelf') { const a = proj(s.x, 1.55, s.y - .3); pill(a.x, a.y, `${s.stock}/${shelfCap()}`, s.stock ? '#2f9e5b' : '#d9443a', U * .22); }
+    if (s.kind === 'shelf') { const a = proj(s.x + s.w / 2 - .32, .12, s.y + s.h / 2 + .12); pill(a.x, a.y, `${s.stock}/${shelfCap()}`, s.stock ? '#2f9e5b' : '#d9443a', U * .22); }
     if (s.kind === 'machine') { const a = proj(s.x - .5, 1.95, s.y - .3); pill(a.x, a.y, `🍎 ${s.input}/${M_IN}`, '#1f2a22', U * .2); if (s.input > 0) bar(proj(s.x, 1.15, s.y - .2), s.t / s.time, U); }
   }
   if (queue.length && staffed() && regT > 0) bar(proj(byId.reg.x, 1.55, byId.reg.y), regT / 0.45, U);
