@@ -64,7 +64,7 @@ Para colocar no ar de graça, arraste a pasta `web/` em https://app.netlify.com/
 
 ## Jogo: Mercadinho (`web/mercadinho/`)
 
-Um jogo casual de mercadinho em **3D estilo cartoon** (Three.js, incluído na pasta), **sem anúncios**, que roda no navegador do iPhone e do Android e pode ser
+Um jogo casual de mercadinho em **3D estilo cartoon** (paleta Pastel Doce) (Three.js, incluído na pasta), **sem anúncios**, que roda no navegador do iPhone e do Android e pode ser
 instalado na tela inicial (funciona sem internet depois da primeira visita).
 
 - **Como jogar:** arraste o dedo em qualquer lugar da tela para andar (no computador, use WASD ou as setas).
@@ -72,6 +72,10 @@ instalado na tela inicial (funciona sem internet depois da primeira visita).
 - **Loja:** encoste nas prateleiras para abastecê-las. Os clientes pegam o que querem e vão para a fila.
 - **Caixa:** fique no quadrado ao lado do caixa para atender; depois pegue o dinheiro que fica no balcão.
 - **Expandir:** pare em cima das placas verdes para comprar novas áreas (milho, ovos, leite, maçã, máquina de suco...).
+- **Aberto / Fechado:** a placa no canto da tela abre e fecha o mercado. Fechado, não entram clientes novos
+  (quem já está na loja termina as compras); a fazenda e os funcionários continuam trabalhando.
+- **Personalizar (👕):** escolha pele, cabelo, chapéu, camisa e calça do seu personagem e de cada funcionário,
+  com prévia em 3D, ou aplique o mesmo uniforme em toda a equipe.
 - **Melhorias (🛠️):** mochila maior, tênis, adubo, prateleiras maiores, fama, preços premium,
   e contratar **caixa** e **repositores** que trabalham sozinhos.
 
