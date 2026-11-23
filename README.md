@@ -61,3 +61,18 @@ próprio aparelho, com exportação e importação de backup em Ajustes.
 
 Para colocar no ar de graça, arraste a pasta `web/` em https://app.netlify.com/drop
 (ou use Cloudflare Pages / GitHub Pages). Não precisa de servidor nem de banco de dados.
+
+## Jogo: Mercadinho (`web/mercadinho/`)
+
+Um jogo casual de mercadinho, **sem anúncios**, que roda no navegador do iPhone e do Android e pode ser
+instalado na tela inicial (funciona sem internet depois da primeira visita).
+
+- **Como jogar:** arraste o dedo em qualquer lugar da tela para andar (no computador, use WASD ou as setas).
+- **Fazenda:** passe pelas plantações, galinheiro, curral e pomar para colher os produtos (eles vão para a sua pilha).
+- **Loja:** encoste nas prateleiras para abastecê-las. Os clientes pegam o que querem e vão para a fila.
+- **Caixa:** fique no quadrado ao lado do caixa para atender; depois pegue o dinheiro que fica no balcão.
+- **Expandir:** pare em cima das placas verdes para comprar novas áreas (milho, ovos, leite, maçã, máquina de suco...).
+- **Melhorias (🛠️):** mochila maior, tênis, adubo, prateleiras maiores, fama, preços premium,
+  e contratar **caixa** e **repositores** que trabalham sozinhos.
+
+O progresso fica salvo no próprio aparelho. Publicado junto com a pasta `web/`, o jogo fica em `…/mercadinho/`.

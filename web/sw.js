@@ -1,5 +1,5 @@
 // Offline support: keeps the app working without internet after the first visit.
-const CACHE = 'napalma-v2';
+const CACHE = 'napalma-v3';
 const FILES = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
@@ -8,13 +8,16 @@ self.addEventListener('install', e => {
 
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys()
-    .then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+    .then(keys => Promise.all(keys.filter(k => k.startsWith('napalma-') && k !== CACHE).map(k => caches.delete(k))))
     .then(() => self.clients.claim()));
 });
 
 self.addEventListener('fetch', e => {
   const req = e.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== location.origin) return;
+  const url = new URL(req.url);
+  if (req.method !== 'GET' || url.origin !== location.origin) return;
+  // The game in mercadinho/ has its own service worker and cache.
+  if (url.pathname.includes('/mercadinho/')) return;
   if (req.mode === 'navigate') {
     // Network first, so updates arrive; cached copy when offline.
     e.respondWith(fetch(req).then(res => {
