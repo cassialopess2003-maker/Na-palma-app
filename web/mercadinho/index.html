@@ -40,6 +40,7 @@
 html, body { margin: 0; height: 100%; overflow: hidden; background: var(--page); font-family: var(--font);
   -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; overscroll-behavior: none; }
 canvas { position: fixed; inset: 0; display: block; touch-action: none; }
+#gl { pointer-events: none; }
 [hidden] { display: none !important; }
 
 #hud { position: fixed; left: 0; right: 0; top: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px;
@@ -98,7 +99,8 @@ canvas { position: fixed; inset: 0; display: block; touch-action: none; }
 </style>
 </head>
 <body>
-<canvas id="c"></canvas>
+<canvas id="gl"></canvas>
+<canvas id="ov"></canvas>
 
 <div id="hud">
   <div class="pill" id="moneyPill"><span class="coin">$</span><b id="moneyV">0</b></div>
@@ -138,6 +140,7 @@ canvas { position: fixed; inset: 0; display: block; touch-action: none; }
   </div>
 </div>
 
+<script src="three.min.js"></script>
 <script>
 'use strict';
 /* ---------- Basics ---------- */
@@ -154,18 +157,28 @@ if (!CanvasRenderingContext2D.prototype.roundRect) {
   };
 }
 
-const cv = $('#c'), ctx = cv.getContext('2d');
-let DPR = 1, VW = 0, VH = 0, T = 48;
+// Two layers: the 3D world (WebGL) and a 2D overlay for speech bubbles, prices and the joystick.
+const glc = $('#gl'), ov = $('#ov'), ctx = ov.getContext('2d');
+let DPR = 1, VW = 0, VH = 0, U = 48, camDist = 18;
+const renderer = new THREE.WebGLRenderer({ canvas: glc, antialias: true, powerPreference: 'high-performance' });
+renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+const SKY = 0xa8dcf0; renderer.setClearColor(SKY);
+const scene = new THREE.Scene(); scene.fog = new THREE.Fog(SKY, 34, 70);
+const camera = new THREE.PerspectiveCamera(38, 1, 0.5, 150);
+const CAM_DIR = new THREE.Vector3(0, 0.72, 0.69).normalize();
+const FOVT = () => Math.tan(camera.fov * Math.PI / 360);
 function resize() {
   DPR = Math.min(2, window.devicePixelRatio || 1); VW = innerWidth; VH = innerHeight;
-  cv.width = Math.round(VW * DPR); cv.height = Math.round(VH * DPR);
-  cv.style.width = VW + 'px'; cv.style.height = VH + 'px';
-  T = clamp(Math.min(VW / 8.4, VH / 12.5), 34, 70);
+  renderer.setPixelRatio(DPR); renderer.setSize(VW, VH);
+  ov.width = Math.round(VW * DPR); ov.height = Math.round(VH * DPR); ov.style.width = VW + 'px'; ov.style.height = VH + 'px';
+  camera.aspect = VW / VH; camera.updateProjectionMatrix();
+  camDist = clamp(9.6 / (2 * FOVT() * camera.aspect), 13, 24);
+  U = VH / (2 * camDist * FOVT());
   emoCache.clear();
 }
 addEventListener('resize', resize);
 
-/* ---------- Emoji sprites (cached) ---------- */
+/* ---------- 2D overlay helpers ---------- */
 const emoCache = new Map();
 function emoji(ch, size) {
   const px = Math.max(8, Math.round(size * DPR)); const key = ch + px;
@@ -191,8 +204,7 @@ function rr(x, y, w, h, r, fill, stroke, lw) {
   if (fill) { ctx.fillStyle = fill; ctx.fill(); }
   if (stroke) { ctx.lineWidth = lw || 2; ctx.strokeStyle = stroke; ctx.stroke(); }
 }
-function ellipse(x, y, rx, ry, fill) { ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill(); }
-function circle(x, y, r, fill) { ellipse(x, y, r, r, fill); }
+function circle(x, y, r, fill) { ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill(); }
 
 /* ---------- Game data ---------- */
 const W = 15, H = 24, STORE_H = 11;
@@ -271,7 +283,6 @@ const cash = { amount: 0 };
 const player = { x: 7.5, y: 9.6, dir: { x: 0, y: 1 }, moving: false, walkT: 0, stack: [], actT: 0,
   look: { shirt: '#e8483b', skin: '#f1c27d', hair: '#4a2e1a', cap: '#e8483b' } };
 const customers = [], queue = [], helpers = [], flyers = [], floats = [], coins = [], confetti = [];
-const cam = { x: 7.5, y: 9 };
 let regT = 0, spawnT = 2.5, time = 0, cashier = null;
 
 /* ---------- Save / load ---------- */
@@ -341,14 +352,14 @@ function buzz(ms) { if (S.vib && navigator.vibrate) try { navigator.vibrate(ms);
 /* ---------- Input ---------- */
 const joy = { on: false, id: null, ox: 0, oy: 0, x: 0, y: 0 };
 const keys = new Set();
-cv.addEventListener('pointerdown', e => {
+ov.addEventListener('pointerdown', e => {
   unlockAudio(); if (joy.on) return;
   Object.assign(joy, { on: true, id: e.pointerId, ox: e.clientX, oy: e.clientY, x: e.clientX, y: e.clientY });
-  try { cv.setPointerCapture(e.pointerId); } catch (_) {}
+  try { ov.setPointerCapture(e.pointerId); } catch (_) {}
 });
-cv.addEventListener('pointermove', e => { if (joy.on && e.pointerId === joy.id) { joy.x = e.clientX; joy.y = e.clientY; } });
+ov.addEventListener('pointermove', e => { if (joy.on && e.pointerId === joy.id) { joy.x = e.clientX; joy.y = e.clientY; } });
 const endJoy = e => { if (e.pointerId === joy.id) joy.on = false; };
-cv.addEventListener('pointerup', endJoy); cv.addEventListener('pointercancel', endJoy);
+ov.addEventListener('pointerup', endJoy); ov.addEventListener('pointercancel', endJoy);
 addEventListener('keydown', e => { keys.add(e.key.toLowerCase()); unlockAudio(); });
 addEventListener('keyup', e => keys.delete(e.key.toLowerCase()));
 addEventListener('blur', () => { keys.clear(); joy.on = false; });
@@ -399,8 +410,8 @@ const isSink = s => s.unlocked && (s.kind === 'shelf' || s.kind === 'machine');
 const sinkSpace = s => s.kind === 'shelf' ? shelfCap() - s.stock : M_IN - s.input;
 const hasSink = item => stations.some(s => isSink(s) && sinkItem(s) === item);
 const sourcesFor = item => stations.filter(s => s.unlocked && (s.kind === 'plot' || s.kind === 'machine') && s.item === item);
-function fly(e, x0, y0, x1, y1, d = 0.28) { flyers.push({ e, x0, y0, x1, y1, t: 0, d }); }
-function floatText(s, x, y, color = '#fff') { floats.push({ s, x, y, t: 0, color }); }
+function fly(k, x0, z0, h0, x1, z1, h1, d = 0.28) { flyers.push({ k, x0, z0, h0, x1, z1, h1, t: 0, d }); }
+function floatText(s, x, z, color = '#fff') { floats.push({ s, x, z, h: 1.8, t: 0, color }); }
 let toastT = 0;
 function toast(msg) { const el = $('#toast'); el.textContent = msg; el.classList.add('on'); toastT = 2.4; }
 const LOOKS = { shirt: ['#4f8ff7', '#f7b84f', '#9b59d0', '#2fb5a3', '#f06292', '#7cb342', '#ff8a65', '#5c6bc0', '#26a69a'],
@@ -416,14 +427,14 @@ function playerAct() {
     if (s.kind === 'shelf' && near(s, player, 0.75)) {
       const i = st.lastIndexOf(s.item);
       if (i >= 0 && s.stock < shelfCap()) {
-        st.splice(i, 1); s.stock++; s.bump = 1; fly(P[s.item].e, player.x, player.y - 1, s.x + rnd(-0.8, 0.8), s.y - 0.3); sfx('drop');
+        st.splice(i, 1); s.stock++; s.bump = 1; fly(s.item, player.x, player.y, 0.9, s.x + rnd(-0.8, 0.8), s.y, 0.6); sfx('drop');
         if (S.tut === 1) setTut(2);
         return true;
       }
     }
     if (s.kind === 'machine' && near(s, player, 0.6)) {
       const i = st.lastIndexOf(s.inItem);
-      if (i >= 0 && s.input < M_IN) { st.splice(i, 1); s.input++; s.bump = 1; fly(P[s.inItem].e, player.x, player.y - 1, s.x - 0.6, s.y - 0.5); sfx('drop'); return true; }
+      if (i >= 0 && s.input < M_IN) { st.splice(i, 1); s.input++; s.bump = 1; fly(s.inItem, player.x, player.y, 0.9, s.x - 0.5, s.y - 0.3, 1.5); sfx('drop'); return true; }
     }
   }
   for (const s of stations) {
@@ -433,7 +444,7 @@ function playerAct() {
       if (!noSinkWarned[s.item]) { noSinkWarned[s.item] = 1; toast(`Compre a prateleira de ${P[s.item].n.toLowerCase()} primeiro`); }
       continue;
     }
-    s.stock--; st.push(s.item); fly(P[s.item].e, s.x + rnd(-0.6, 0.6), s.y, player.x, player.y - 1); sfx('pick');
+    s.stock--; st.push(s.item); fly(s.item, s.x + rnd(-0.6, 0.6), s.y, 0.3, player.x, player.y, 0.9); sfx('pick');
     if (S.tut === 0) setTut(1);
     return true;
   }
@@ -464,7 +475,7 @@ function updatePlayer(dt) {
     if (dist(player, s) < 0.85 && S.money > 0) {
       const rem = s.cost - s.paid, amt = Math.min(S.money, rem, Math.max(s.cost * dt / 1.3, 30 * dt));
       S.money -= amt; s.paid += amt; payTick -= dt;
-      if (payTick <= 0) { payTick = 0.07; sfx('pay'); coins.push({ sx: moneyScreen().x, sy: moneyScreen().y, tx: sx(s.x), ty: sy(s.y), t: 0, d: 0.35 }); }
+      if (payTick <= 0) { payTick = 0.07; sfx('pay'); coins.push({ sx: moneyScreen().x, sy: moneyScreen().y, tx: proj(s.x, .1, s.y).x, ty: proj(s.x, .1, s.y).y, t: 0, d: 0.35 }); }
       if (s.paid >= s.cost - 0.001) unlock(s);
     }
   }
@@ -472,15 +483,15 @@ function updatePlayer(dt) {
 }
 function unlock(s) {
   s.unlocked = true; s.paid = s.cost; s.bump = 1.5;
-  for (let i = 0; i < 40; i++) confetti.push({ x: s.x, y: s.y, vx: rnd(-4, 4), vy: rnd(-7, -2), t: 0, c: pick(['#ffd43b', '#ff6b6b', '#4dabf7', '#69db7c', '#f783ac']) });
+  for (let i = 0; i < 50; i++) confetti.push({ x: s.x, z: s.y, h: .5, vx: rnd(-3, 3), vz: rnd(-3, 3), vh: rnd(4, 9), t: 0, c: pick(['#ffd43b', '#ff6b6b', '#4dabf7', '#69db7c', '#f783ac']) });
   sfx('unlock'); buzz(40); toast(`🎉 ${label(s)} liberado!`);
   if (S.tut === 4) setTut(5);
   save();
 }
 function collectCash() {
   const a = cash.amount; cash.amount = 0; S.money += a;
-  const n = Math.min(12, Math.ceil(a / 6)), m = moneyScreen();
-  for (let i = 0; i < n; i++) coins.push({ sx: sx(CASH.x) + rnd(-12, 12), sy: sy(CASH.y) + rnd(-12, 12), tx: m.x, ty: m.y, t: -i * 0.04, d: 0.45 });
+  const n = Math.min(12, Math.ceil(a / 6)), m = moneyScreen(), cp = proj(CASH.x, .3, CASH.y);
+  for (let i = 0; i < n; i++) coins.push({ sx: cp.x + rnd(-12, 12), sy: cp.y + rnd(-12, 12), tx: m.x, ty: m.y, t: -i * 0.04, d: 0.45 });
   sfx('coin'); buzz(15);
   if (S.tut === 3) setTut(4);
 }
@@ -505,7 +516,7 @@ function updCustomer(c, dt) {
     if (S.tut >= 5) c.pat += dt;
     c.tk -= dt; c.dir = { x: 0, y: -1 };
     const sh = c.shelf;
-    if (sh.stock > 0 && c.tk <= 0) { sh.stock--; c.have++; c.tk = 0.35; sh.bump = 0.6; fly(P[c.item].e, sh.x + rnd(-0.8, 0.8), sh.y - 0.3, c.x, c.y - 0.9, 0.22); }
+    if (sh.stock > 0 && c.tk <= 0) { sh.stock--; c.have++; c.tk = 0.35; sh.bump = 0.6; fly(c.item, sh.x + rnd(-0.8, 0.8), sh.y, 0.6, c.x, c.y, 0.9, 0.22); }
     if (c.have >= c.want) { c.state = 'queue'; queue.push(c); }
     else if (c.pat > 40) { c.angry = true; if (c.have > 0) { c.state = 'queue'; queue.push(c); } else leave(c); }
   } else if (c.state === 'queue') {
@@ -522,8 +533,8 @@ function updRegister(dt) {
     regT = 0; queue.shift();
     const amt = Math.round(P[f.item].price * f.have * priceMult());
     cash.amount += amt; S.earned += amt; S.served++;
-    floatText('+$' + amt, f.x, f.y - 1.6, '#c8ffb0');
-    for (let i = 0; i < Math.min(5, f.have); i++) fly('💵', f.x, f.y - 0.6, CASH.x + rnd(-0.2, 0.2), CASH.y - 0.2, 0.3 + i * 0.05);
+    floatText('+$' + amt, f.x, f.y, '#c8ffb0');
+    for (let i = 0; i < Math.min(5, f.have); i++) fly('nota', f.x, f.y, 0.9, CASH.x + rnd(-0.2, 0.2), CASH.y, 0.4, 0.3 + i * 0.05);
     sfx('cash'); f.happy = true; leave(f);
     if (S.tut === 2) setTut(3);
   }
@@ -574,7 +585,7 @@ function updHelper(h, dt) {
       h.wait += dt; if (h.t > 0) break;
       const s = h.src, room = sinkSpace(h.sink) - h.stack.length;
       if (s.stock > 0 && h.stack.length < helperCap() && room > 0) {
-        s.stock--; h.stack.push(s.item); fly(P[s.item].e, s.x + rnd(-0.6, 0.6), s.y, h.x, h.y - 0.9, 0.22); h.t = 0.16; h.wait = 0;
+        s.stock--; h.stack.push(s.item); fly(s.item, s.x + rnd(-0.6, 0.6), s.y, 0.3, h.x, h.y, 0.9, 0.22); h.t = 0.16; h.wait = 0;
       } else if (h.stack.length && (h.stack.length >= helperCap() || room <= 0 || h.wait > 2.5)) goSink(h);
       else if (!h.stack.length && h.wait > 4) { h.state = 'idle'; h.sink = null; }
       break;
@@ -585,7 +596,7 @@ function updHelper(h, dt) {
       const s = h.sink, i = h.stack.lastIndexOf(sinkItem(s));
       if (i >= 0 && sinkSpace(s) > 0) {
         h.stack.splice(i, 1); if (s.kind === 'shelf') s.stock++; else s.input++; s.bump = 0.6;
-        fly(P[sinkItem(s)].e, h.x, h.y - 0.9, s.x + rnd(-0.7, 0.7), s.y - 0.3, 0.22); h.t = 0.13;
+        fly(sinkItem(s), h.x, h.y, 0.9, s.x + rnd(-0.7, 0.7), s.y, 0.6, 0.22); h.t = 0.13;
       } else { h.state = 'idle'; h.sink = null; h.t = 0.3; }
       break;
     }
@@ -625,286 +636,404 @@ function update(dt) {
   }
   updateSpawn(dt);
   for (const c of customers) updCustomer(c, dt);
-  for (let i = customers.length - 1; i >= 0; i--) if (customers[i].dead) customers.splice(i, 1);
+  for (let i = customers.length - 1; i >= 0; i--) if (customers[i].dead) { if (customers[i].pp) scene.remove(customers[i].pp.g); customers.splice(i, 1); }
   updRegister(dt);
   for (const h of helpers) updHelper(h, dt);
   for (const f of flyers) f.t += dt;
   for (const f of floats) f.t += dt;
   for (const c of coins) c.t += dt;
-  for (const c of confetti) { c.t += dt; c.x += c.vx * dt; c.y += c.vy * dt; c.vy += 14 * dt; }
-  prune(flyers, f => f.t >= f.d); prune(floats, f => f.t >= 1.1); prune(coins, c => c.t >= c.d); prune(confetti, c => c.t >= 1.2);
+  for (const c of confetti) { c.t += dt; c.x += c.vx * dt; c.z += c.vz * dt; c.h += c.vh * dt; c.vh -= 14 * dt; if (c.h < .03) { c.h = .03; c.vh = 0; c.vx *= .85; c.vz *= .85; } }
+  prune(flyers, f => f.t >= f.d); prune(floats, f => f.t >= 1.1); prune(coins, c => c.t >= c.d); prune(confetti, c => c.t >= 1.6);
   if (toastT > 0 && (toastT -= dt) <= 0) $('#toast').classList.remove('on');
   updateCam(dt);
 }
 function prune(a, dead) { for (let i = a.length - 1; i >= 0; i--) if (dead(a[i])) a.splice(i, 1); }
-function updateCam(dt) {
-  const hw = VW / 2 / T, hh = VH / 2 / T;
-  let tx = player.x, ty = player.y;
-  const minX = -1.4 + hw, maxX = W + 0.6 - hw; tx = minX > maxX ? W / 2 - 0.4 : clamp(tx, minX, maxX);
-  const minY = -1.9 + hh, maxY = H + 0.4 - hh; ty = minY > maxY ? H / 2 : clamp(ty, minY, maxY);
-  const k = Math.min(1, dt * 7); cam.x += (tx - cam.x) * k; cam.y += (ty - cam.y) * k;
+
+/* ---------- 3D: toon materials and shared shapes ---------- */
+const gradTex = new THREE.DataTexture(new Uint8Array([105, 185, 235]), 3, 1, THREE.LuminanceFormat);
+gradTex.minFilter = gradTex.magFilter = THREE.NearestFilter; gradTex.generateMipmaps = false; gradTex.needsUpdate = true;
+const matCache = new Map();
+function mat(c) { let m = matCache.get(c); if (!m) { m = new THREE.MeshToonMaterial({ color: c, gradientMap: gradTex }); matCache.set(c, m); } return m; }
+const OUTLINE = new THREE.MeshBasicMaterial({ color: 0x3b2a1f, side: THREE.BackSide });
+const GEO = { box: new THREE.BoxGeometry(1, 1, 1), sph: new THREE.SphereGeometry(0.5, 18, 14), cyl: new THREE.CylinderGeometry(0.5, 0.5, 1, 18),
+  cone: new THREE.ConeGeometry(0.5, 1, 14), ico: new THREE.IcosahedronGeometry(0.5, 1), plane: new THREE.PlaneGeometry(1, 1) };
+// One cartoon part: scaled shape with toon shading and an optional ink outline (inverted hull).
+function part(parent, geo, color, s, p, o = {}) {
+  const m = new THREE.Mesh(GEO[geo] || geo, o.mat || mat(color));
+  m.scale.set(s[0], s[1], s[2]); m.position.set(p[0], p[1], p[2]);
+  if (o.rot) m.rotation.set(o.rot[0], o.rot[1], o.rot[2]);
+  m.castShadow = o.cast !== false; m.receiveShadow = o.recv !== false;
+  if (o.line) {
+    const l = new THREE.Mesh(m.geometry, OUTLINE);
+    l.scale.set(1 + o.line / s[0], 1 + o.line / s[1], 1 + o.line / s[2]); l.castShadow = false; l.receiveShadow = false; m.add(l);
+  }
+  parent.add(m); return m;
 }
 
-/* ---------- Drawing ---------- */
-const sx = x => (x - cam.x) * T + VW / 2, sy = y => (y - cam.y) * T + VH / 2;
-function drawGround() {
-  ctx.fillStyle = '#69ad4c'; ctx.fillRect(0, 0, VW, VH);
-  // Street and sidewalk outside the door
-  ctx.fillStyle = '#7c838a'; ctx.fillRect(sx(-8), sy(-3), (8 - 1.3) * T, (H + 6) * T);
-  ctx.fillStyle = '#d6d0c2'; ctx.fillRect(sx(-1.3), sy(-3), 1.3 * T, (H + 6) * T);
-  ctx.fillStyle = 'rgba(255,255,255,.8)';
-  for (let y = -2; y < H + 3; y += 1.6) ctx.fillRect(sx(-4.4), sy(y), 0.18 * T, 0.8 * T);
-  const x0 = Math.max(0, Math.floor(cam.x - VW / 2 / T)), x1 = Math.min(W, Math.ceil(cam.x + VW / 2 / T));
-  const y0 = Math.max(0, Math.floor(cam.y - VH / 2 / T)), y1 = Math.min(H, Math.ceil(cam.y + VH / 2 / T));
-  for (let y = y0; y < y1; y++) for (let x = x0; x < x1; x++) {
-    ctx.fillStyle = y < STORE_H ? ((x + y) % 2 ? '#f4e8d0' : '#ecdcbd') : ((x + y) % 2 ? '#8fcf65' : '#87c75d');
-    ctx.fillRect(sx(x), sy(y), T + 0.5, T + 0.5);
+/* ---------- Products (pooled, reused every frame) ---------- */
+const PH = { tomate: 0.22, milho: 0.17, ovo: 0.23, leite: 0.32, maca: 0.25, suco: 0.3, nota: 0.06 };
+function buildProduct(k) {
+  const g = new THREE.Group(), L = 0.022, o = x => Object.assign({ cast: false }, x || {});
+  switch (k) {
+    case 'tomate': part(g, 'sph', 0xe8402f, [.26, .22, .26], [0, .11, 0], o({ line: L })); part(g, 'cone', 0x3f9b3a, [.15, .07, .15], [0, .23, 0], o()); break;
+    case 'milho': part(g, 'cyl', 0xffcf33, [.13, .3, .13], [-.02, .085, 0], o({ rot: [0, 0, Math.PI / 2], line: L })); part(g, 'cone', 0x5fae3a, [.15, .16, .15], [.17, .085, 0], o({ rot: [0, 0, -Math.PI / 2] })); break;
+    case 'ovo': part(g, 'sph', 0xfff3dc, [.18, .23, .18], [0, .115, 0], o({ line: L })); break;
+    case 'leite': part(g, 'cyl', 0xffffff, [.16, .26, .16], [0, .13, 0], o({ line: L })); part(g, 'cyl', 0x3d8bfd, [.166, .08, .166], [0, .13, 0], o()); part(g, 'cyl', 0x3d8bfd, [.09, .06, .09], [0, .29, 0], o()); break;
+    case 'maca': part(g, 'sph', 0xd62828, [.25, .23, .25], [0, .115, 0], o({ line: L })); part(g, 'cyl', 0x6b3f1d, [.025, .08, .025], [0, .26, 0], o()); part(g, 'sph', 0x4cb043, [.09, .03, .05], [.05, .26, 0], o()); break;
+    case 'suco': part(g, 'box', 0xff9f1c, [.18, .26, .12], [0, .13, 0], o({ line: L })); part(g, 'box', 0xffffff, [.186, .08, .126], [0, .15, 0], o()); part(g, 'cyl', 0xffffff, [.022, .12, .022], [.045, .31, 0], o()); break;
+    case 'nota': part(g, 'box', 0x5fbf5f, [.36, .05, .2], [0, .025, 0], o({ line: .015 })); part(g, 'cyl', 0x2e7d32, [.07, .054, .07], [0, .026, 0], o()); break;
   }
-  // Dirt path from the store to the farm
-  ctx.fillStyle = '#d9b77f'; ctx.fillRect(sx(7.1), sy(STORE_H), 0.8 * T, (H - STORE_H) * T);
-  ctx.fillStyle = '#d9b77f'; ctx.fillRect(sx(0.4), sy(12.1), (W - 0.8) * T, 0.5 * T);
-  ctx.fillRect(sx(0.4), sy(16.2), (W - 0.8) * T, 0.4 * T); ctx.fillRect(sx(0.4), sy(20.05), (W - 0.8) * T, 0.4 * T);
-  // Door mat
-  rr(sx(0.15), sy(8.6), 0.9 * T, 1.4 * T, 6, '#c0392b');
-  // Back wall with sign
-  ctx.fillStyle = '#d56b4b'; ctx.fillRect(sx(-0.15), sy(-1.1), (W + 0.3) * T, 1.1 * T);
-  ctx.fillStyle = 'rgba(0,0,0,.12)'; ctx.fillRect(sx(-0.15), sy(-0.12), (W + 0.3) * T, 0.12 * T);
-  for (let i = 0; i < 15; i++) { ctx.fillStyle = i % 2 ? '#ffffff' : '#2f9e5b'; ctx.fillRect(sx(i), sy(-1.1), T + 0.5, 0.32 * T); }
-  rr(sx(W / 2 - 2.3), sy(-0.72), 4.6 * T, 0.56 * T, 8, '#fff7e0');
-  txt('MERCADINHO', sx(W / 2), sy(-0.44), T * 0.38, '#c0392b', null, 900);
-  // Walls
-  for (const w of WALLS) { rr(sx(w.x), sy(w.y) - T * 0.12, w.w * T, w.h * T + T * 0.12, 3, '#b98d5f'); ctx.fillStyle = '#d4ab7c'; ctx.fillRect(sx(w.x), sy(w.y) - T * 0.12, w.w * T, T * 0.1); }
+  return g;
 }
-function drawPad(s) {
-  const X = sx(s.x - s.w / 2), Y = sy(s.y - s.h / 2);
-  ctx.save(); ctx.setLineDash([8, 6]); rr(X, Y, s.w * T, s.h * T, 10, 'rgba(255,255,255,.18)', 'rgba(255,255,255,.85)', 2.5); ctx.restore();
-  const pw = 1.75 * T, ph = 1.15 * T, px = sx(s.x) - pw / 2, py = sy(s.y) - ph / 2;
-  const pulse = 1 + Math.sin(time * 5) * 0.03;
-  ctx.save(); ctx.translate(sx(s.x), sy(s.y)); ctx.scale(pulse, pulse); ctx.translate(-sx(s.x), -sy(s.y));
-  rr(px, py + 4, pw, ph, 12, 'rgba(0,0,0,.2)');
-  rr(px, py, pw, ph, 12, '#2f9e5b');
-  const f = s.paid / s.cost;
-  if (f > 0) { ctx.save(); ctx.beginPath(); ctx.roundRect(px, py, pw, ph, 12); ctx.clip(); ctx.fillStyle = '#7ddc8e'; ctx.fillRect(px, py + ph * (1 - f), pw, ph * f); ctx.restore(); }
-  rr(px, py, pw, ph, 12, null, '#fff', 3);
-  drawE(s.kind === 'machine' ? '🧃' : P[s.item].e, sx(s.x), py + ph * 0.34, T * 0.42);
-  txt('$' + fmt(Math.ceil(s.cost - s.paid)), sx(s.x), py + ph * 0.74, T * 0.3, '#fff', 'rgba(0,60,20,.6)');
-  ctx.restore();
-  txt(label(s), sx(s.x), py - T * 0.28, T * 0.27, '#fff', 'rgba(0,0,0,.6)');
+const pool = {};
+function item(k) { const p = pool[k] || (pool[k] = { list: [], n: 0 }); let m = p.list[p.n]; if (!m) { m = buildProduct(k); scene.add(m); p.list.push(m); } p.n++; m.visible = true; return m; }
+function putItem(k, x, h, z, s = 1, ry = 0) { const m = item(k); m.position.set(x, h, z); m.scale.setScalar(s); m.rotation.set(0, ry, 0); return m; }
+function poolBegin() { for (const k in pool) pool[k].n = 0; }
+function poolEnd() { for (const k in pool) { const p = pool[k]; for (let i = p.n; i < p.list.length; i++) p.list[i].visible = false; } }
+
+/* ---------- Characters and animals ---------- */
+function buildPerson(look) {
+  const g = new THREE.Group(), L = 0.03, legs = [], arms = [];
+  for (const sd of [-1, 1]) {
+    const hip = new THREE.Group(); hip.position.set(sd * 0.1, 0.32, 0); g.add(hip);
+    part(hip, 'cyl', look.pants || 0x34495e, [.12, .3, .12], [0, -.15, 0], { line: L }); part(hip, 'sph', 0x2b2b2b, [.14, .09, .2], [0, -.3, .03]); legs.push(hip);
+  }
+  const body = new THREE.Group(); g.add(body);
+  part(body, 'sph', look.shirt, [.46, .5, .38], [0, .56, 0], { line: L });
+  for (const sd of [-1, 1]) {
+    const sh = new THREE.Group(); sh.position.set(sd * .24, .7, 0); body.add(sh);
+    part(sh, 'cyl', look.shirt, [.1, .26, .1], [0, -.12, 0], { line: L }); part(sh, 'sph', look.skin, [.11, .11, .11], [0, -.27, 0]); arms.push(sh);
+  }
+  const head = new THREE.Group(); head.position.set(0, 1.02, 0); body.add(head);
+  part(head, 'sph', look.skin, [.46, .44, .44], [0, 0, 0], { line: L });
+  if (look.cap) { part(head, 'sph', look.cap, [.49, .3, .47], [0, .1, -.01]); part(head, 'box', look.cap, [.32, .04, .2], [0, .11, .24], { line: .015 }); }
+  else part(head, 'sph', look.hair, [.49, .36, .47], [0, .08, -.04]);
+  for (const sd of [-1, 1]) {
+    part(head, 'sph', 0x241812, [.06, .085, .04], [sd * .09, 0, .205], { cast: false });
+    part(head, 'sph', 0xff9e9e, [.07, .035, .02], [sd * .14, -.07, .19], { cast: false });
+  }
+  scene.add(g);
+  return { g, legs, arms, body };
 }
+function animPerson(o, dt, carry) {
+  const pp = o.pp; pp.g.position.set(o.x, 0, o.y);
+  const tgt = Math.atan2(o.dir.x, o.dir.y); let d = tgt - pp.g.rotation.y; d = Math.atan2(Math.sin(d), Math.cos(d));
+  pp.g.rotation.y += d * Math.min(1, dt * 12);
+  const ph = o.walkT * 10, sw = o.moving ? Math.sin(ph) * 0.65 : 0;
+  pp.legs[0].rotation.x = sw; pp.legs[1].rotation.x = -sw;
+  pp.arms[0].rotation.x = carry ? -1.25 : -sw * 0.8; pp.arms[1].rotation.x = carry ? -1.25 : sw * 0.8;
+  pp.body.position.y = o.moving ? Math.abs(Math.sin(ph)) * 0.05 : Math.sin(time * 2 + o.x) * 0.01;
+}
+// Products carried in a tower in front of the character.
+function drawStack(o, stack) {
+  o.stackTop = 1.3;
+  if (!stack.length) return;
+  const r = o.pp.g.rotation.y, fx = Math.sin(r), fz = Math.cos(r), sc = o.pp.g.scale.x;
+  let h = (0.5 + o.pp.body.position.y) * sc;
+  for (let i = 0; i < stack.length; i++) {
+    const k = stack[i], sway = o.moving ? Math.sin(time * 9 - i * .5) * 0.012 * i : 0;
+    putItem(k, o.x + fx * .36 * sc + fz * sway, h, o.y + fz * .38 * sc - fx * sway, 1.35, r); h += PH[k] * 1.35;
+  }
+  o.stackTop = h;
+}
+function buildChicken(color) {
+  const g = new THREE.Group(), L = .02;
+  part(g, 'sph', color, [.32, .28, .38], [0, .27, 0], { line: L }); part(g, 'sph', color, [.2, .2, .2], [0, .47, .14], { line: L });
+  part(g, 'box', 0xe63946, [.04, .08, .1], [0, .6, .13]); part(g, 'cone', 0xffa62b, [.06, .08, .06], [0, .46, .27], { rot: [Math.PI / 2, 0, 0] });
+  for (const sd of [-1, 1]) { part(g, 'sph', 0x222222, [.035, .045, .03], [sd * .07, .5, .22], { cast: false }); part(g, 'cyl', 0xffa62b, [.03, .14, .03], [sd * .07, .07, 0]); }
+  return g;
+}
+function buildCow() {
+  const g = new THREE.Group(), L = .03;
+  part(g, 'sph', 0xffffff, [.75, .6, 1.1], [0, .75, 0], { line: L });
+  part(g, 'sph', 0x2a2a2a, [.3, .25, .35], [.25, .88, .15], { cast: false }); part(g, 'sph', 0x2a2a2a, [.28, .22, .3], [-.22, .8, -.25], { cast: false });
+  for (const [x, z] of [[.22, .32], [-.22, .32], [.22, -.32], [-.22, -.32]]) part(g, 'cyl', 0xffffff, [.13, .5, .13], [x, .25, z], { line: L });
+  part(g, 'sph', 0xffb3c1, [.22, .12, .22], [0, .44, -.05]);
+  const hd = new THREE.Group(); hd.position.set(0, .95, .6); g.add(hd);
+  part(hd, 'box', 0xffffff, [.42, .38, .38], [0, 0, 0], { line: L }); part(hd, 'box', 0xffb3c1, [.44, .18, .16], [0, -.1, .2], { line: L });
+  for (const sd of [-1, 1]) {
+    part(hd, 'sph', 0x222222, [.06, .08, .04], [sd * .12, .06, .19], { cast: false });
+    part(hd, 'cone', 0xf1e0b0, [.07, .14, .07], [sd * .17, .25, 0]);
+    part(hd, 'sph', 0xffffff, [.16, .08, .1], [sd * .27, .1, -.04]);
+  }
+  g.userData.head = hd; return g;
+}
+
+/* ---------- Stations ---------- */
 const PLANT_SPOTS = [[-0.8, -0.55], [0, -0.55], [0.8, -0.55], [-0.8, 0.5], [0, 0.5], [0.8, 0.5]];
-function drawPlotFlat(s) {
-  const X = sx(s.x - s.w / 2), Y = sy(s.y - s.h / 2), w = s.w * T, h = s.h * T;
+const APPLE_SPOTS = [[-.55, 1.75, .78], [0, 2.35, .75], [.55, 1.75, .78], [-.3, 1.3, .85], [.35, 1.3, .85], [0, 1.8, .97]];
+function buildStation(s) {
+  const g = new THREE.Group(); g.position.set(s.x, 0, s.y); scene.add(g); s.g = g; const w = s.w, h = s.h;
   if (s.look === 'field') {
-    rr(X, Y + 4, w, h, 12, '#7a4d26'); rr(X, Y, w, h, 12, '#a8703f');
-    ctx.fillStyle = 'rgba(0,0,0,.12)';
-    for (let i = 0; i < 2; i++) rr(X + w * 0.08, sy(s.y + PLANT_SPOTS[i * 3][1]) + T * 0.1, w * 0.84, T * 0.16, 6, 'rgba(60,30,10,.25)');
-    const p = s.t / s.time;
-    PLANT_SPOTS.forEach(([dx, dy], i) => {
-      const x = sx(s.x + dx), y = sy(s.y + dy);
-      if (i < s.stock) { drawLeaves(x, y + T * 0.12, 1, s.item); drawE(P[s.item].e, x, y - T * 0.08 + Math.sin(time * 3 + i) * 1.5, T * 0.55); }
-      else drawLeaves(x, y + T * 0.12, i === s.stock ? 0.35 + 0.55 * p : 0.3, s.item);
+    part(g, 'box', 0x7a4d26, [w, .16, h], [0, .08, 0], { line: .03 }); part(g, 'box', 0x9a6337, [w - .15, .04, h - .15], [0, .17, 0]);
+    for (const dz of [-.55, .5]) part(g, 'box', 0x83532c, [w - .3, .07, .55], [0, .2, dz]);
+    const c = s.item === 'milho' ? 0x5fae3a : 0x3f9b3a;
+    s.sprouts = PLANT_SPOTS.map(([dx, dz]) => {
+      const sp = new THREE.Group(); sp.position.set(dx, .22, dz); g.add(sp);
+      part(sp, 'sph', c, [.28, .1, .13], [-.1, .1, 0], { rot: [0, 0, .5] }); part(sp, 'sph', c, [.28, .1, .13], [.1, .1, 0], { rot: [0, 0, -.5] });
+      part(sp, 'cyl', 0x4cb043, [.04, .2, .04], [0, .1, 0]); return sp;
     });
   } else if (s.look === 'coop') {
-    rr(X, Y + 4, w, h, 12, '#bfa35a'); rr(X, Y, w, h, 12, '#ead48a');
-    ctx.fillStyle = 'rgba(180,140,60,.35)'; for (let i = 0; i < 14; i++) { const a = (i * 97) % 100 / 100, b = (i * 53) % 100 / 100; ctx.fillRect(X + a * w * 0.9 + 4, Y + h * 0.45 + b * h * 0.5, 10, 2); }
-    rr(X + w * 0.1, sy(s.y + 0.62), w * 0.8, T * 0.5, 10, '#c9a24a');
-    for (let i = 0; i < s.stock; i++) drawE('🥚', sx(s.x + (i - 2.5) * 0.36), sy(s.y + 0.84), T * 0.4);
+    part(g, 'box', 0xe2c675, [w, .08, h], [0, .04, 0], { line: .03 });
+    const hs = new THREE.Group(); hs.position.set(0, 0, -.65); g.add(hs);
+    part(hs, 'box', 0xd98a5a, [1.7, .85, .9], [0, .5, 0], { line: .03 }); part(hs, 'box', 0x6b3a22, [.4, .55, .04], [0, .36, .46]);
+    for (const sd of [-1, 1]) part(hs, 'box', 0xe0483c, [1.05, .08, 1.12], [sd * .43, 1.13, 0], { rot: [0, 0, -sd * .62], line: .03 });
+    part(g, 'box', 0xc9a24a, [2.1, .12, .42], [0, .1, .85], { line: .02 });
+    s.anim = [buildChicken(0xffffff), buildChicken(0xf4a259)];
+    s.anim.forEach((c, i) => { c.position.set(i ? .55 : -.6, .08, .15); g.add(c); });
   } else if (s.look === 'barn') {
-    rr(X, Y + 4, w, h, 12, '#6e9e43'); rr(X, Y, w, h, 12, '#a6d46f');
-    ctx.lineWidth = 4; ctx.strokeStyle = '#8b5a2b'; ctx.beginPath(); ctx.roundRect(X + 4, Y + 4, w - 8, h - 8, 10); ctx.stroke();
-    ctx.lineWidth = 2; ctx.beginPath(); ctx.roundRect(X + 10, Y + 10, w - 20, h - 20, 8); ctx.stroke();
-    rr(X + w * 0.1, sy(s.y + 0.6), w * 0.8, T * 0.52, 8, '#8b5a2b');
-    for (let i = 0; i < s.stock; i++) drawE('🥛', sx(s.x + (i - 2.5) * 0.36), sy(s.y + 0.84), T * 0.42);
+    part(g, 'box', 0x9ccc65, [w, .06, h], [0, .03, 0]);
+    const fence = 0xa0663a, hw = w / 2 - .08, hh = h / 2 - .08, posts = [];
+    for (let i = 0; i <= 4; i++) { const t = -hw + i * (hw / 2); posts.push([t, -hh], [t, hh]); }
+    for (let i = 1; i < 4; i++) { const t = -hh + i * (hh / 2); posts.push([-hw, t], [hw, t]); }
+    for (const [x, z] of posts) part(g, 'box', fence, [.1, .5, .1], [x, .25, z], { line: .02 });
+    for (const y of [.22, .4]) {
+      part(g, 'box', fence, [2 * hw, .06, .05], [0, y, -hh]); part(g, 'box', fence, [2 * hw, .06, .05], [0, y, hh]);
+      part(g, 'box', fence, [.05, .06, 2 * hh], [-hw, y, 0]); part(g, 'box', fence, [.05, .06, 2 * hh], [hw, y, 0]);
+    }
+    part(g, 'box', 0x8b5a2b, [2.0, .18, .42], [0, .11, .78], { line: .02 });
+    const cow = buildCow(); cow.position.set(0, 0, -.25); cow.rotation.y = .5; g.add(cow); s.anim = [cow];
   } else if (s.look === 'tree') {
-    rr(X, Y, w, h, 14, 'rgba(60,120,40,.25)');
-    ellipse(sx(s.x), sy(s.y + 0.75), T * 1.1, T * 0.35, 'rgba(0,0,0,.18)');
+    part(g, 'cyl', 0x5aa83f, [2.5, .04, 2.5], [0, .02, 0]);
+    part(g, 'cyl', 0x8b5a2b, [.3, 1.3, .3], [0, .65, 0], { line: .03 });
+    const cn = new THREE.Group(); cn.position.y = 1.8; g.add(cn); s.canopy = cn;
+    part(cn, 'ico', 0x3f9b3a, [1.9, 1.6, 1.8], [0, 0, 0], { line: .04 });
+    part(cn, 'ico', 0x358a33, [1.1, 1, 1.1], [-.7, -.25, -.1]); part(cn, 'ico', 0x4cb043, [1.0, .9, 1.0], [.65, .3, -.2]);
+  } else if (s.kind === 'machine') {
+    part(g, 'box', 0x5c7cfa, [2.0, 1.0, 1.0], [0, .5, -.3], { line: .03 }); part(g, 'box', 0x91a7ff, [1.6, .5, .04], [0, .6, .21]);
+    part(g, 'cone', 0x748ffc, [.8, .55, .8], [-.5, 1.27, -.3], { rot: [Math.PI, 0, 0], line: .03 });
+    part(g, 'box', 0x4263eb, [.5, .25, .3], [.55, .35, .3], { line: .02 });
+    part(g, 'box', 0xced4da, [2.1, .12, .5], [0, .06, .6], { line: .02 });
+  } else if (s.kind === 'shelf') {
+    const fr = s.look === 'fridge', wood = fr ? 0xe9f5fc : 0xa86b3c, dark = fr ? 0x9cc9e6 : 0x8a5530;
+    part(g, 'box', dark, [w, .12, h], [0, .06, 0], { line: .03 });
+    part(g, 'box', wood, [w, 1.1, .08], [0, .6, -h / 2 + .04], { line: .03 });
+    for (const sd of [-1, 1]) part(g, 'box', wood, [.08, 1.1, h], [sd * (w / 2 - .04), .6, 0], { line: .03 });
+    part(g, 'box', wood, [w - .12, .05, h - .04], [0, .38, 0]); part(g, 'box', wood, [w - .12, .05, h / 2], [0, .8, -h / 4]);
+    part(g, 'box', fr ? 0x4dabf7 : 0xffffff, [w, .12, .1], [0, 1.18, -h / 2 + .05], { line: .02 });
+  } else if (s.kind === 'register') {
+    part(g, 'box', 0x8d6e63, [w, .78, h], [0, .39, 0], { line: .03 }); part(g, 'box', 0xbca08a, [w + .08, .06, h + .08], [0, .8, 0]);
+    part(g, 'box', 0x455a64, [.5, .3, .4], [-.55, .98, -.1], { line: .02 }); part(g, 'box', 0xa5f3c2, [.38, .16, .03], [-.55, 1.02, .11]);
+    part(g, 'box', 0x2f2f2f, [.95, .03, .5], [.45, .84, 0]);
   }
+  g.visible = s.unlocked;
 }
-function drawLeaves(x, y, k, item) {
-  const c = item === 'milho' ? '#5fae3a' : '#3f9b3a';
-  ctx.save(); ctx.translate(x, y); ctx.scale(k, k);
-  ellipse(-T * 0.13, -T * 0.05, T * 0.16, T * 0.08, c); ellipse(T * 0.13, -T * 0.05, T * 0.16, T * 0.08, c);
-  ellipse(0, -T * 0.14, T * 0.07, T * 0.16, '#4cb043');
-  ctx.restore();
+// "For sale" spot: dashed outline of the future building plus a green plate that fills up as you pay.
+function buildPad(s) {
+  const g = new THREE.Group(); g.position.set(s.x, 0, s.y); scene.add(g);
+  const hw = s.w / 2, hh = s.h / 2, dash = .28, gap = .2;
+  for (const [ax, az, bx, bz] of [[-hw, -hh, hw, -hh], [hw, -hh, hw, hh], [hw, hh, -hw, hh], [-hw, hh, -hw, -hh]]) {
+    const len = Math.hypot(bx - ax, bz - az), n = Math.floor(len / (dash + gap)), off = (len - n * (dash + gap)) / 2, horiz = az === bz;
+    for (let i = 0; i < n; i++) { const t = (off + i * (dash + gap) + dash / 2) / len; part(g, 'box', 0xffffff, [horiz ? dash : .07, .03, horiz ? .07 : dash], [ax + (bx - ax) * t, .03, az + (bz - az) * t], { cast: false }); }
+  }
+  const plate = new THREE.Group(); g.add(plate);
+  part(plate, 'box', 0x23804a, [1.75, .1, 1.2], [0, .05, 0], { line: .035, cast: false });
+  const fill = part(plate, 'box', 0x7ddc8e, [1.6, .11, 1.05], [0, .06, 0], { cast: false });
+  s.pad = { g, plate, fill }; g.visible = false;
 }
-function drawPlotTall(s) {
-  const bob = 1 + s.bump * 0.06;
-  if (s.look === 'coop') {
-    const hx = sx(s.x), top = sy(s.y - 1.25), bw = 1.8 * T, bh = 0.95 * T;
-    rr(hx - bw / 2, top, bw, bh, 6, '#c97b4a'); ctx.fillStyle = '#5a3420'; rr(hx - T * 0.22, top + bh * 0.4, T * 0.44, bh * 0.6, 6, '#5a3420');
-    ctx.beginPath(); ctx.moveTo(hx - bw / 2 - 8, top + 4); ctx.lineTo(hx, top - T * 0.55); ctx.lineTo(hx + bw / 2 + 8, top + 4); ctx.closePath(); ctx.fillStyle = '#d9453a'; ctx.fill();
-    drawE('🐔', sx(s.x - 0.65 + Math.sin(time * 0.9 + s.x) * 0.25), sy(s.y + 0.1), T * 0.62);
-    drawE('🐓', sx(s.x + 0.6 + Math.cos(time * 0.7) * 0.2), sy(s.y + 0.15), T * 0.6);
+
+/* ---------- World ---------- */
+function canvasTex(w, h, draw, rx = 1, ry = 1) {
+  const c = document.createElement('canvas'); c.width = w; c.height = h; draw(c.getContext('2d'), w, h);
+  const t = new THREE.CanvasTexture(c); t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(rx, ry); t.anisotropy = 4; return t;
+}
+const texMat = t => new THREE.MeshToonMaterial({ map: t, gradientMap: gradTex });
+function ground(x0, z0, x1, z1, color, y = 0, m) {
+  const p = new THREE.Mesh(GEO.plane, m || mat(color)); p.rotation.x = -Math.PI / 2;
+  p.scale.set(x1 - x0, z1 - z0, 1); p.position.set((x0 + x1) / 2, y, (z0 + z1) / 2); p.receiveShadow = true; scene.add(p); return p;
+}
+function checker(a, b) { return (g) => { g.fillStyle = a; g.fillRect(0, 0, 64, 64); g.fillStyle = b; g.fillRect(0, 0, 32, 32); g.fillRect(32, 32, 32, 32); }; }
+function decoTree(x, z, s = 1) {
+  const g = new THREE.Group(); g.position.set(x, 0, z); g.scale.setScalar(s); scene.add(g);
+  part(g, 'cyl', 0x8b5a2b, [.28, 1, .28], [0, .5, 0], { line: .03 });
+  part(g, 'ico', pick([0x3f9b3a, 0x358a33, 0x4cb043]), [1.5, 1.4, 1.5], [0, 1.45, 0], { line: .04 });
+  part(g, 'ico', 0x4cb043, [.9, .8, .9], [.2, 2.05, .1]);
+}
+function buildWorld() {
+  ground(-40, -40, 40, 60, 0x6db04f, -0.02);
+  ground(0, 0, W, STORE_H, 0, 0, texMat(canvasTex(64, 64, checker('#f4e8d0', '#e8d6b3'), W / 2, STORE_H / 2)));
+  ground(0, STORE_H, W, H + .5, 0, 0, texMat(canvasTex(64, 64, checker('#8fcf65', '#86c75c'), W / 2, (H + .5 - STORE_H) / 2)));
+  ground(-10, -4, -1.3, H + 8, 0x80878e, 0.001); ground(-1.3, -4, 0, H + 8, 0xd6d0c2, 0.002);
+  for (let z = -3; z < H + 7; z += 1.6) ground(-4.6, z, -4.35, z + .8, 0xffffff, .004);
+  ground(7.1, STORE_H, 7.9, H + .5, 0xd9b77f, .004);
+  for (const [z0, z1] of [[12.1, 12.6], [16.2, 16.6], [20.05, 20.45]]) ground(.4, z0, W - .4, z1, 0xd9b77f, .004);
+  ground(.15, 8.6, 1.05, 10, 0xc0392b, .006);
+  for (const w of WALLS) part(scene, 'box', 0xeed3ab, [w.w, .7, w.h], [w.x + w.w / 2, .35, w.y + w.h / 2], { line: .03 });
+  part(scene, 'box', 0xeed3ab, [.3, .7, STORE_H + .2], [W + .15, .35, STORE_H / 2 - .1], { line: .03 });
+  // Back wall, awning and sign
+  part(scene, 'box', 0xd56b4b, [W + .6, 2.4, .4], [W / 2, 1.2, -.35], { line: .04 });
+  for (let i = 0; i < W; i++) part(scene, 'box', i % 2 ? 0xffffff : 0x2f9e5b, [1, .07, .9], [i + .5, 2.35, .05], { rot: [.42, 0, 0], line: .02 });
+  const sign = new THREE.Mesh(GEO.plane, new THREE.MeshBasicMaterial({ map: canvasTex(512, 96, (g, w, h) => {
+    g.fillStyle = '#fff7e0'; g.beginPath(); g.roundRect(4, 4, w - 8, h - 8, 26); g.fill();
+    g.lineWidth = 6; g.strokeStyle = '#3b2a1f'; g.stroke();
+    g.fillStyle = '#c0392b'; g.font = '900 62px ui-rounded,system-ui,sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('MERCADINHO', w / 2, h / 2 + 3);
+  }) }));
+  sign.scale.set(5.2, .975, 1); sign.position.set(W / 2, 1.45, -.14); scene.add(sign);
+  // Farm fence, trees and bushes around the edges
+  for (let z = STORE_H + .4; z <= H + .3; z += 1.2) part(scene, 'box', 0xa0663a, [.1, .55, .1], [-.1, .27, z], { line: .02 });
+  part(scene, 'box', 0xa0663a, [.05, .06, H - STORE_H], [-.1, .4, (H + STORE_H) / 2]);
+  for (let z = 1.5; z < H + 2; z += 3.4) decoTree(W + 1.6 + (z % 2), z, .9 + (z % 3) * .1);
+  for (let x = 1; x < W + 2; x += 3.2) decoTree(x, H + 1.8 + (x % 2) * .5, 1);
+  for (let x = -.5; x < W + 1; x += 2.1) part(scene, 'ico', 0x358a33, [.9, .6, .7], [x + .5, .25, -.75], { line: .03 });
+}
+// Lights: soft sky light plus a sun with cartoon shadows that follows the camera.
+const hemi = new THREE.HemisphereLight(0xffffff, 0x7d9466, 0.5); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff4e0, 0.6); sun.castShadow = true; sun.shadow.mapSize.set(1024, 1024);
+Object.assign(sun.shadow.camera, { left: -14, right: 14, top: 14, bottom: -14, near: 1, far: 50 });
+sun.shadow.bias = -0.0006; sun.shadow.normalBias = 0.02; scene.add(sun, sun.target);
+
+const cashG = new THREE.Group(); cashG.position.set(CASH.x, 0, CASH.y); scene.add(cashG);
+part(cashG, 'box', 0xd8c3a5, [1.0, .08, .7], [0, .04, 0], { line: .02 });
+const bills = [];
+for (let i = 0; i < 24; i++) { const b = buildProduct('nota'), col = i % 2, layer = Math.floor(i / 2); b.position.set(-.2 + col * .4, .08 + layer * .055, ((layer % 2) * .05) - .025); b.rotation.y = ((i * 0.37) % 1 - .5) * .3; cashG.add(b); bills.push(b); }
+const standG = new THREE.Group(); standG.position.set(REG_STAND.x, 0, REG_STAND.y); scene.add(standG);
+const standM = [[1.1, .07, 0, -.4], [1.1, .07, 0, .4], [.07, .8, -.55, 0], [.07, .8, .55, 0]].map(([a, b, x, z]) => part(standG, 'box', 0xffffff, [a, .03, b], [x, .02, z], { cast: false }));
+const arrowG = new THREE.Group(); scene.add(arrowG);
+part(arrowG, 'cone', 0xffd43b, [.55, .5, .55], [0, .25, 0], { rot: [Math.PI, 0, 0], line: .04, cast: false });
+part(arrowG, 'cyl', 0xffd43b, [.24, .45, .24], [0, .7, 0], { line: .04, cast: false });
+
+function initWorld() {
+  buildWorld();
+  for (const s of stations) { buildStation(s); if (!START.includes(s.id)) buildPad(s); }
+}
+
+/* ---------- Camera ---------- */
+const camT = new THREE.Vector3(7.5, 0, 9);
+function updateCam(dt) {
+  const halfW = camDist * FOVT() * camera.aspect;
+  const minX = -0.6 + halfW * 0.85, maxX = W + 0.6 - halfW * 0.85;
+  const tx = minX > maxX ? W / 2 - 0.3 : clamp(player.x, minX, maxX), tz = clamp(player.y, 3, H - 4.5);
+  const k = Math.min(1, dt * 6); camT.x += (tx - camT.x) * k; camT.z += (tz - camT.z) * k;
+  camera.position.copy(camT).addScaledVector(CAM_DIR, camDist); camera.lookAt(camT);
+  sun.position.set(camT.x - 6, 16, camT.z + 7); sun.target.position.copy(camT);
+}
+
+/* ---------- Sync game state -> 3D scene ---------- */
+const _v = new THREE.Vector3();
+function proj(x, h, z) { _v.set(x, h, z).project(camera); return { x: (_v.x + 1) / 2 * VW, y: (1 - _v.y) / 2 * VH, z: _v.z }; }
+let curObj = null, arrowOn = false;
+function syncStation(s) {
+  const st = s.stock;
+  if (s.look === 'field') {
+    const p = s.t / s.time;
+    s.sprouts.forEach((sp, i) => {
+      sp.scale.setScalar(i < st ? 1 : i === st ? .3 + .7 * p : .25);
+      if (i < st) { const [dx, dz] = PLANT_SPOTS[i]; putItem(s.item, s.x + dx, .36 + Math.sin(time * 3 + i) * .025, s.y + dz, 1.7, .3); }
+    });
+  } else if (s.look === 'coop') {
+    for (let i = 0; i < st; i++) putItem('ovo', s.x + (i - 2.5) * .3, .16, s.y + .85, 1.2);
+    s.anim.forEach((c, i) => { const ph = time * (i ? .7 : .9) + s.x + i * 2; c.position.x = (i ? .55 : -.6) + Math.sin(ph) * .28; c.rotation.y = Math.cos(ph) > 0 ? 1.3 : -1.3; c.position.y = .08 + Math.abs(Math.sin(time * 7 + i)) * .03; });
   } else if (s.look === 'barn') {
-    drawE('🐄', sx(s.x + Math.sin(time * 0.5 + s.y) * 0.35), sy(s.y - 0.35), T * 1.15);
+    for (let i = 0; i < st; i++) putItem('leite', s.x + (i - 2.5) * .32, .2, s.y + .78, 1.05);
+    const cow = s.anim[0]; cow.position.x = Math.sin(time * .4 + s.y) * .3; cow.userData.head.rotation.x = Math.sin(time * 1.3 + s.y) * .15;
   } else if (s.look === 'tree') {
-    const x = sx(s.x), y = sy(s.y);
-    rr(x - T * 0.16, y - T * 0.1, T * 0.32, T * 0.85, 6, '#8b5a2b');
-    ctx.save(); ctx.translate(x, y - T * 0.45); ctx.scale(bob, bob);
-    circle(-T * 0.55, T * 0.05, T * 0.62, '#358a33'); circle(T * 0.55, T * 0.05, T * 0.62, '#358a33'); circle(0, -T * 0.35, T * 0.75, '#3f9b3a');
-    circle(-T * 0.2, -T * 0.55, T * 0.3, 'rgba(255,255,255,.12)');
-    const spots = [[-0.6, 0], [0, -0.5], [0.6, 0], [-0.3, 0.25], [0.3, 0.25], [0, -0.05]];
-    for (let i = 0; i < s.stock; i++) drawE('🍎', spots[i][0] * T, spots[i][1] * T, T * 0.4);
-    ctx.restore();
+    s.canopy.scale.setScalar(1 + Math.sin(time * 1.5 + s.x) * .015);
+    for (let i = 0; i < st; i++) { const [ax, ay, az] = APPLE_SPOTS[i]; putItem('maca', s.x + ax, ay - .15, s.y + az, 1.4); }
+  } else if (s.kind === 'machine') {
+    for (let i = 0; i < st; i++) putItem('suco', s.x - .85 + i * .24, .12, s.y + .6, 1);
+    for (let i = 0; i < Math.min(4, s.input); i++) putItem('maca', s.x - .62 + (i % 2) * .24, 1.5 + Math.floor(i / 2) * .15, s.y - .4 + (i % 2) * .15, 1.1);
+  } else if (s.kind === 'shelf') {
+    const n = Math.min(st, 24), w = s.w, sc = PH[s.item] > .28 ? 1.05 : 1.5;
+    for (let i = 0; i < n; i++) {
+      const col = i % 6, slot = Math.floor(i / 6);
+      const up = slot % 2, x = s.x - (w - .55) / 2 + col * (w - .55) / 5 + (slot >= 2 ? .1 : 0);
+      putItem(s.item, x, up ? .825 : .405, s.y + (up ? -.22 : .2) + (slot >= 2 ? (up ? .14 : .14) : 0), sc);
+    }
   }
 }
-function drawShelf(s) {
-  const X = sx(s.x - s.w / 2), Y = sy(s.y - s.h / 2), w = s.w * T, h = s.h * T, fridge = s.look === 'fridge';
-  const k = 1 + s.bump * 0.04;
-  ctx.save(); ctx.translate(sx(s.x), sy(s.y)); ctx.scale(k, k); ctx.translate(-sx(s.x), -sy(s.y));
-  ellipse(sx(s.x), Y + h + 4, w * 0.52, T * 0.16, 'rgba(0,0,0,.15)');
-  rr(X, Y - T * 0.55, w, h + T * 0.55, 8, fridge ? '#cfe3f3' : '#9a6234');
-  rr(X + 4, Y - T * 0.5, w - 8, h + T * 0.12, 6, fridge ? '#eaf6ff' : '#b77b45');
-  if (fridge) { ctx.fillStyle = 'rgba(255,255,255,.55)'; ctx.fillRect(X + w * 0.15, Y - T * 0.45, 5, h + T * 0.05); }
-  ctx.fillStyle = fridge ? 'rgba(110,150,190,.35)' : 'rgba(80,40,10,.25)'; ctx.fillRect(X + 4, Y + h * 0.18, w - 8, 3);
-  const n = Math.min(s.stock, 24), cols = 6, sz = T * 0.4;
-  for (let i = 0; i < n; i++) {
-    const col = i % cols, row = Math.floor(i / cols) % 2, layer = Math.floor(i / 12);
-    drawE(P[s.item].e, X + w * 0.12 + col * (w * 0.76 / (cols - 1)), Y + h * 0.42 - row * T * 0.38 - layer * T * 0.1, sz);
+function sync(dt) {
+  poolBegin();
+  const pads = visiblePads();
+  for (const s of stations) {
+    if (s.pad) {
+      const on = pads.includes(s); s.pad.g.visible = on;
+      if (on) {
+        const f = s.paid / s.cost; s.pad.fill.visible = f > 0.001;
+        s.pad.fill.scale.z = Math.max(.001, 1.05 * f); s.pad.fill.position.z = .525 - 1.05 * f / 2;
+        s.pad.plate.scale.setScalar(1 + Math.sin(time * 5) * .03);
+        putItem(s.item, s.x, .55 + Math.sin(time * 3) * .08, s.y - .1, 2, time * 1.5);
+      }
+    }
+    s.g.visible = s.unlocked; if (!s.unlocked) continue;
+    const k = 1 + s.bump * 0.05; s.g.scale.set(k, k, k);
+    syncStation(s);
   }
-  rr(sx(s.x) - T * 0.5, Y + h - T * 0.12, T, T * 0.34, 6, '#fff');
-  txt(`${s.stock}/${shelfCap()}`, sx(s.x), Y + h + T * 0.05, T * 0.22, s.stock ? '#2f9e5b' : '#d9443a', null, 900);
-  ctx.restore();
-}
-function drawRegister(s) {
-  const X = sx(s.x - s.w / 2), Y = sy(s.y - s.h / 2), w = s.w * T, h = s.h * T;
-  ellipse(sx(s.x), Y + h + 3, w * 0.52, T * 0.15, 'rgba(0,0,0,.15)');
-  rr(X, Y, w, h, 8, '#7b5a48'); rr(X, Y, w, h * 0.55, 8, '#a1887f');
-  rr(sx(s.x - 0.75), Y - T * 0.32, T * 0.7, T * 0.5, 5, '#455a64'); rr(sx(s.x - 0.7), Y - T * 0.28, T * 0.6, T * 0.22, 3, '#a5f3c2');
-  rr(sx(s.x + 0.2), Y + 3, T * 0.6, T * 0.3, 4, '#37474f');
-  if (queue.length && staffed() && regT > 0) {
-    rr(sx(s.x) - T * 0.6, Y - T * 0.6, T * 1.2, 6, 3, 'rgba(0,0,0,.25)');
-    rr(sx(s.x) - T * 0.6, Y - T * 0.6, T * 1.2 * Math.min(1, regT / 0.45), 6, 3, '#ffd43b');
+  for (const c of customers) {
+    if (!c.pp) { c.pp = buildPerson(c.look); c.pp.g.scale.setScalar(.95); c.pp.g.rotation.y = Math.PI / 2; }
+    animPerson(c, dt, c.have > 0);
+    if (c.have) drawStack(c, Array(Math.min(c.have, 6)).fill(c.item));
   }
-}
-function drawMachine(s) {
-  const X = sx(s.x - s.w / 2), Y = sy(s.y - s.h / 2), w = s.w * T, h = s.h * T;
-  const k = 1 + s.bump * 0.05;
-  ctx.save(); ctx.translate(sx(s.x), sy(s.y)); ctx.scale(k, k); ctx.translate(-sx(s.x), -sy(s.y));
-  ellipse(sx(s.x), Y + h + 2, w * 0.55, T * 0.2, 'rgba(0,0,0,.18)');
-  rr(X, Y - T * 0.3, w, h * 0.75, 12, '#5c7cfa'); rr(X + 5, Y - T * 0.26, w - 10, T * 0.2, 8, 'rgba(255,255,255,.25)');
-  rr(X + w * 0.12, Y + T * 0.05, w * 0.76, T * 0.62, 10, '#e7f0ff');
-  drawE('🍎', X + w * 0.3, Y + T * 0.36, T * 0.4); txt('➜', sx(s.x), Y + T * 0.36, T * 0.32, '#5c7cfa', null);
-  drawE('🧃', X + w * 0.7, Y + T * 0.36, T * 0.4);
-  if (s.input > 0) { rr(X + w * 0.12, Y + T * 0.75, w * 0.76, 6, 3, 'rgba(0,0,0,.2)'); rr(X + w * 0.12, Y + T * 0.75, w * 0.76 * (s.t / s.time), 6, 3, '#ffd43b'); }
-  rr(X - 6, Y - T * 0.5, T * 0.95, T * 0.4, 10, '#fff');
-  txt(`🍎 ${s.input}/${M_IN}`, X - 6 + T * 0.475, Y - T * 0.3, T * 0.2, '#1f2a22', null);
-  rr(X + w * 0.05, Y + h * 0.78, w * 0.9, T * 0.42, 8, '#ced4da');
-  for (let i = 0; i < s.stock; i++) drawE('🧃', X + w * 0.14 + i * (w * 0.72 / 7), Y + h * 0.78 + T * 0.2, T * 0.34);
-  ctx.restore();
-}
-function drawPerson(o, opts = {}) {
-  const x = sx(o.x), y = sy(o.y), s = T * 0.36 * (opts.scale || 1), L = o.look;
-  const ph = o.walkT * 11, bob = o.moving ? Math.abs(Math.sin(ph)) * s * 0.16 : 0;
-  ellipse(x, y, s * 0.75, s * 0.28, 'rgba(0,0,0,.2)');
-  const legA = o.moving ? Math.sin(ph) * s * 0.22 : 0;
-  rr(x - s * 0.42, y - s * 0.55 - legA * 0.3, s * 0.32, s * 0.6 + legA * 0.3, s * 0.15, '#34495e');
-  rr(x + s * 0.1, y - s * 0.55 + legA * 0.3, s * 0.32, s * 0.6 - legA * 0.3, s * 0.15, '#34495e');
-  rr(x - s * 0.62, y - s * 1.6 - bob, s * 1.24, s * 1.25, s * 0.48, L.shirt);
-  rr(x - s * 0.62, y - s * 1.6 - bob, s * 1.24, s * 0.35, s * 0.3, 'rgba(255,255,255,.18)');
-  const hy = y - s * 2.05 - bob;
-  circle(x, hy, s * 0.58, L.skin);
-  const up = o.dir.y < -0.55;
-  ctx.fillStyle = L.hair; ctx.beginPath();
-  if (up) ctx.arc(x, hy, s * 0.6, 0, Math.PI * 2); else ctx.arc(x, hy - s * 0.05, s * 0.6, Math.PI * 1.02, Math.PI * 1.98);
-  ctx.fill();
-  if (L.cap) { ctx.fillStyle = L.cap; ctx.beginPath(); ctx.arc(x, hy - s * 0.12, s * 0.6, Math.PI, 0); ctx.fill(); if (!up) rr(x - s * 0.15 + o.dir.x * s * 0.35, hy - s * 0.2, s * 0.62, s * 0.16, s * 0.08, L.cap); }
-  if (!up) {
-    const ex = o.dir.x * s * 0.22;
-    circle(x - s * 0.2 + ex, hy + s * 0.08, s * 0.08, '#2b1b10'); circle(x + s * 0.2 + ex, hy + s * 0.08, s * 0.08, '#2b1b10');
+  for (const h of helpers) { if (!h.pp) h.pp = buildPerson(h.look); animPerson(h, dt, h.stack.length > 0); drawStack(h, h.stack); }
+  if (cashier) { if (!cashier.pp) cashier.pp = buildPerson(cashier.look); animPerson(cashier, dt, false); }
+  if (!player.pp) player.pp = buildPerson(player.look);
+  animPerson(player, dt, player.stack.length > 0); drawStack(player, player.stack);
+  for (const f of flyers) {
+    const k = clamp(f.t / f.d, 0, 1), e = k * (2 - k);
+    putItem(f.k, f.x0 + (f.x1 - f.x0) * e, f.h0 + (f.h1 - f.h0) * e + Math.sin(k * Math.PI) * .8, f.z0 + (f.z1 - f.z0) * e, f.k === 'nota' ? 1.3 : 1.15, k * 6);
   }
-  if (opts.stack && opts.stack.length) {
-    const side = o.dir.x >= 0 ? 1 : -1, bx = x + side * s * 0.55, by = y - s * 1.25 - bob, sz = s * 0.95;
-    opts.stack.forEach((it, i) => drawE(P[it].e, bx + Math.sin(time * 6 + i) * (o.moving ? 1.2 : 0), by - i * s * 0.5, sz));
-    if (opts.max && opts.stack.length >= opts.max) txt('MÁX', bx, by - opts.stack.length * s * 0.5 - s * 0.35, s * 0.55, '#ffd43b', 'rgba(0,0,0,.7)', 900);
+  const nb = Math.min(24, Math.ceil(cash.amount / 5)); bills.forEach((b, i) => { b.visible = i < nb; });
+  const onStand = dist(player, REG_STAND) < 0.8; standG.visible = !S.cashier;
+  for (const m of standM) m.material = mat(onStand ? 0x2f9e5b : 0xffffff);
+  curObj = objective(); arrowOn = false;
+  if (curObj && curObj.p) {
+    const tall = curObj.p.kind === 'shelf' || curObj.p.look === 'tree' ? 2.4 : curObj.p.kind ? 1.9 : 1.6;
+    const a = proj(curObj.p.x, tall, curObj.p.y);
+    arrowOn = a.z < 1 && a.x > 30 && a.x < VW - 30 && a.y > 110 && a.y < VH - 30;
+    arrowG.position.set(curObj.p.x, tall + Math.abs(Math.sin(time * 4)) * .35, curObj.p.y); arrowG.rotation.y = time * 2;
   }
+  arrowG.visible = arrowOn;
+  poolEnd();
 }
-function bubble(x, y, draw, w = T * 1.25) {
-  const h = T * 0.6;
-  rr(x - w / 2, y - h, w, h, h / 2, '#fff');
+
+/* ---------- Overlay (2D on top of 3D) ---------- */
+function pill(x, y, s, color, size) {
+  ctx.font = `900 ${size}px ui-rounded,"SF Pro Rounded",system-ui,sans-serif`;
+  const w = ctx.measureText(s).width + size * 1.1;
+  rr(x - w / 2, y - size * .75, w, size * 1.5, size * .75, 'rgba(255,255,255,.95)', 'rgba(59,42,31,.5)', 1.5);
+  txt(s, x, y + 1, size, color, null, 900);
+}
+function bar(p, f, u) { const w = u * 1.2; rr(p.x - w / 2, p.y, w, 7, 3.5, 'rgba(0,0,0,.35)'); rr(p.x - w / 2, p.y, w * clamp(f, 0, 1), 7, 3.5, '#ffd43b'); }
+function bubble(x, y, draw, w) {
+  const h = U * 0.6;
+  rr(x - w / 2, y - h, w, h, h / 2, '#fff', 'rgba(59,42,31,.35)', 1.5);
   ctx.beginPath(); ctx.moveTo(x - 6, y - 1); ctx.lineTo(x, y + 7); ctx.lineTo(x + 6, y - 1); ctx.fillStyle = '#fff'; ctx.fill();
   draw(x, y - h / 2);
 }
-function drawCustomer(c) {
-  drawPerson(c, { stack: c.state === 'out' ? [] : (c.have ? Array(Math.min(c.have, 5)).fill(c.item) : []), scale: 0.95 });
-  const bx = sx(c.x), by = sy(c.y) - T * 1.05;
-  if (c.state === 'shop' || c.state === 'in') {
-    bubble(bx, by, (x, y) => { drawE(P[c.item].e, x - T * 0.27, y, T * 0.36); txt(`${c.have}/${c.want}`, x + T * 0.22, y, T * 0.25, '#1f2a22', null, 900); });
-  } else if (c.state === 'queue' && queue[0] === c && !staffed()) {
-    bubble(bx, by, (x, y) => drawE('💲', x, y, T * 0.34), T * 0.7);
-  } else if (c.state === 'out' && c.angry && !c.happy) {
-    bubble(bx, by, (x, y) => drawE('😠', x, y, T * 0.36), T * 0.7);
-  } else if (c.state === 'out' && c.happy && dist(c, DOOR_IN) > 0.3) {
-    bubble(bx, by, (x, y) => drawE('😊', x, y, T * 0.36), T * 0.7);
-  }
-}
-function drawCash() {
-  const n = Math.min(24, Math.ceil(cash.amount / 5));
-  const x = sx(CASH.x), y = sy(CASH.y);
-  rr(x - T * 0.55, y - T * 0.35, T * 1.1, T * 0.75, 8, 'rgba(0,0,0,.08)', 'rgba(47,158,91,.5)', 2);
-  for (let i = 0; i < n; i++) {
-    const col = i % 2, layer = Math.floor(i / 2);
-    const bx = x - T * 0.42 + col * T * 0.44, by = y + T * 0.1 - layer * T * 0.07;
-    rr(bx, by - T * 0.14, T * 0.4, T * 0.24, 3, '#5fbf5f', '#2e7d32', 1.5);
-    circle(bx + T * 0.2, by - T * 0.02, T * 0.05, '#2e7d32');
-  }
-  if (cash.amount > 0) txt('$' + fmt(cash.amount), x, y - T * 0.35 - Math.ceil(n / 2) * T * 0.07 - T * 0.18, T * 0.28, '#d8ffc8');
-}
-function drawRegStand() {
-  if (S.cashier) return;
-  const on = dist(player, REG_STAND) < 0.8;
-  ctx.save(); if (!on) ctx.setLineDash([6, 5]);
-  rr(sx(REG_STAND.x - 0.55), sy(REG_STAND.y - 0.4), 1.1 * T, 0.8 * T, 10, on ? 'rgba(47,158,91,.35)' : 'rgba(255,255,255,.35)', on ? '#2f9e5b' : 'rgba(80,60,40,.5)', 2.5);
-  ctx.restore();
+function drawBubble(c) {
+  const a = proj(c.x, 1.55, c.y); if (a.z > 1) return;
+  if (c.state === 'shop' || c.state === 'in') bubble(a.x, a.y, (x, y) => { drawE(P[c.item].e, x - U * .27, y, U * .36); txt(`${c.have}/${c.want}`, x + U * .22, y, U * .25, '#1f2a22', null, 900); }, U * 1.25);
+  else if (c.state === 'queue' && queue[0] === c && !staffed()) bubble(a.x, a.y, (x, y) => drawE('💲', x, y, U * .34), U * .7);
+  else if (c.state === 'out' && c.angry && !c.happy) bubble(a.x, a.y, (x, y) => drawE('😠', x, y, U * .36), U * .7);
+  else if (c.state === 'out' && c.happy && dist(c, DOOR_IN) > 0.3) bubble(a.x, a.y, (x, y) => drawE('😊', x, y, U * .36), U * .7);
 }
 function moneyScreen() { const r = $('#moneyPill').getBoundingClientRect(); return { x: r.left + 20, y: r.top + r.height / 2 }; }
-function drawArrow(o) {
-  if (!o || !o.p) return;
-  const x = sx(o.p.x), y = sy(o.p.y) - T * 0.9, m = 40;
-  const on = x > m && x < VW - m && y > 110 && y < VH - m;
-  ctx.save();
-  if (on) {
-    const b = Math.sin(time * 6) * 6; ctx.translate(x, y - T * 0.3 + b);
-    ctx.beginPath(); ctx.moveTo(-14, -18); ctx.lineTo(14, -18); ctx.lineTo(14, -2); ctx.lineTo(24, -2); ctx.lineTo(0, 20); ctx.lineTo(-24, -2); ctx.lineTo(-14, -2); ctx.closePath();
-  } else {
-    const cx = VW / 2, cy = VH / 2, a = Math.atan2(y - cy, x - cx);
-    const ex = clamp(cx + Math.cos(a) * VW, m, VW - m), ey = clamp(cy + Math.sin(a) * VH, 120, VH - m);
-    ctx.translate(ex, ey); ctx.rotate(a);
-    ctx.beginPath(); ctx.moveTo(22, 0); ctx.lineTo(-12, -18); ctx.lineTo(-6, 0); ctx.lineTo(-12, 18); ctx.closePath();
+function drawOverlay() {
+  ctx.setTransform(DPR, 0, 0, DPR, 0, 0); ctx.clearRect(0, 0, VW, VH);
+  for (const s of visiblePads()) {
+    const a = proj(s.x, .14, s.y + .32); txt('$' + fmt(Math.ceil(s.cost - s.paid)), a.x, a.y, U * .34, '#fff', 'rgba(0,60,20,.8)', 900);
+    const b = proj(s.x, 1.35, s.y); txt(label(s), b.x, b.y, U * .27, '#fff', 'rgba(0,0,0,.6)');
   }
-  ctx.fillStyle = '#ffd43b'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#7a5200'; ctx.stroke();
-  ctx.restore();
-}
-function draw() {
-  ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-  drawGround();
-  for (const s of stations) if (s.unlocked && s.kind === 'plot') drawPlotFlat(s);
-  for (const s of visiblePads()) drawPad(s);
-  drawRegStand(); drawCash();
-  const list = [];
   for (const s of stations) {
     if (!s.unlocked) continue;
-    if (s.kind === 'shelf') list.push([s.y + 0.3, () => drawShelf(s)]);
-    else if (s.kind === 'register') list.push([s.y + 0.2, () => drawRegister(s)]);
-    else if (s.kind === 'machine') list.push([s.y, () => drawMachine(s)]);
-    else if (s.look !== 'field') list.push([s.y + (s.look === 'coop' ? -0.4 : s.look === 'tree' ? 0.45 : 0), () => drawPlotTall(s)]);
+    if (s.kind === 'shelf') { const a = proj(s.x, 1.55, s.y - .3); pill(a.x, a.y, `${s.stock}/${shelfCap()}`, s.stock ? '#2f9e5b' : '#d9443a', U * .22); }
+    if (s.kind === 'machine') { const a = proj(s.x - .5, 1.95, s.y - .3); pill(a.x, a.y, `🍎 ${s.input}/${M_IN}`, '#1f2a22', U * .2); if (s.input > 0) bar(proj(s.x, 1.15, s.y - .2), s.t / s.time, U); }
   }
-  for (const c of customers) list.push([c.y, () => drawCustomer(c)]);
-  for (const h of helpers) list.push([h.y, () => drawPerson(h, { stack: h.stack })]);
-  if (cashier) list.push([cashier.y, () => drawPerson(cashier)]);
-  list.push([player.y, () => drawPerson(player, { stack: player.stack, max: fullWarnT > 0 || player.stack.length >= bagCap() ? bagCap() : 0 })]);
-  list.sort((a, b) => a[0] - b[0]);
-  for (const [, f] of list) f();
-
-  for (const f of flyers) {
-    const k = clamp(f.t / f.d, 0, 1), e = k * (2 - k);
-    drawE(f.e, sx(f.x0 + (f.x1 - f.x0) * e), sy(f.y0 + (f.y1 - f.y0) * e) - Math.sin(k * Math.PI) * T * 0.6, T * 0.42);
+  if (queue.length && staffed() && regT > 0) bar(proj(byId.reg.x, 1.55, byId.reg.y), regT / 0.45, U);
+  if (cash.amount > 0) { const a = proj(CASH.x, .5 + Math.ceil(Math.min(24, Math.ceil(cash.amount / 5)) / 2) * .055, CASH.y); txt('$' + fmt(cash.amount), a.x, a.y - U * .2, U * .3, '#d8ffc8', 'rgba(0,50,10,.75)'); }
+  for (const c of customers) drawBubble(c);
+  if (player.stack.length >= bagCap() || (fullWarnT > 0 && player.stack.length)) { const a = proj(player.x, (player.stackTop || 1.3) + .25, player.y); txt('MÁX', a.x, a.y, U * .3, '#ffd43b', 'rgba(0,0,0,.7)', 900); }
+  for (const f of floats) { const a = proj(f.x, f.h + f.t * .9, f.z); ctx.globalAlpha = 1 - Math.max(0, f.t - 0.6) / 0.5; txt(f.s, a.x, a.y, U * .38, f.color, 'rgba(0,50,10,.7)', 900); }
+  for (const c of confetti) { const a = proj(c.x, c.h, c.z); ctx.globalAlpha = 1 - c.t / 1.6; ctx.fillStyle = c.c; ctx.fillRect(a.x - 4, a.y - 2, 8, 5); }
+  ctx.globalAlpha = 1;
+  if (curObj && curObj.p && !arrowOn) {
+    const a = proj(curObj.p.x, 1, curObj.p.y), cx = VW / 2, cy = VH / 2, m = 40;
+    let ang = Math.atan2(a.y - cy, a.x - cx); if (a.z > 1) ang += Math.PI;
+    const ex = clamp(cx + Math.cos(ang) * VW, m, VW - m), ey = clamp(cy + Math.sin(ang) * VH, 120, VH - m);
+    ctx.save(); ctx.translate(ex, ey); ctx.rotate(ang);
+    ctx.beginPath(); ctx.moveTo(22, 0); ctx.lineTo(-12, -18); ctx.lineTo(-6, 0); ctx.lineTo(-12, 18); ctx.closePath();
+    ctx.fillStyle = '#ffd43b'; ctx.fill(); ctx.lineWidth = 3; ctx.strokeStyle = '#3b2a1f'; ctx.stroke(); ctx.restore();
   }
-  for (const c of confetti) { ctx.fillStyle = c.c; ctx.globalAlpha = 1 - c.t / 1.2; ctx.fillRect(sx(c.x), sy(c.y), 7, 4); }
-  ctx.globalAlpha = 1;
-  for (const f of floats) { ctx.globalAlpha = 1 - Math.max(0, f.t - 0.6) / 0.5; txt(f.s, sx(f.x), sy(f.y) - f.t * T * 0.9, T * 0.38, f.color, 'rgba(0,50,10,.7)', 900); }
-  ctx.globalAlpha = 1;
-  const obj = objective(); drawArrow(obj); setHint(obj && obj.text);
+  setHint(curObj && curObj.text);
   for (const c of coins) {
     if (c.t < 0) continue; const k = clamp(c.t / c.d, 0, 1), e = k * k;
     const x = c.sx + (c.tx - c.sx) * e, y = c.sy + (c.ty - c.sy) * e - Math.sin(k * Math.PI) * 40;
@@ -981,12 +1110,12 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && !re
 addEventListener('pagehide', () => { if (!resetting) save(); });
 
 /* ---------- Main loop ---------- */
-resize(); load(); shownMoney = S.money;
-cam.x = player.x; cam.y = player.y; updateCam(1);
+resize(); load(); initWorld(); shownMoney = S.money;
+camT.set(player.x, 0, player.y); updateCam(1);
 let last = performance.now(), saveT = 0, panelT = 0;
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
-  update(dt); draw(); updateHud(dt);
+  update(dt); sync(dt); renderer.render(scene, camera); drawOverlay(); updateHud(dt);
   if ((saveT += dt) > 4) { saveT = 0; if (!resetting) save(); }
   if (!$('#upScrim').hidden && (panelT += dt) > 0.3) { panelT = 0; refreshPanel(); }
   requestAnimationFrame(frame);

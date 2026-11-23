@@ -64,7 +64,7 @@ Para colocar no ar de graça, arraste a pasta `web/` em https://app.netlify.com/
 
 ## Jogo: Mercadinho (`web/mercadinho/`)
 
-Um jogo casual de mercadinho, **sem anúncios**, que roda no navegador do iPhone e do Android e pode ser
+Um jogo casual de mercadinho em **3D estilo cartoon** (Three.js, incluído na pasta), **sem anúncios**, que roda no navegador do iPhone e do Android e pode ser
 instalado na tela inicial (funciona sem internet depois da primeira visita).
 
 - **Como jogar:** arraste o dedo em qualquer lugar da tela para andar (no computador, use WASD ou as setas).
