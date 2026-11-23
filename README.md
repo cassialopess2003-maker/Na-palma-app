@@ -74,6 +74,8 @@ instalado na tela inicial (funciona sem internet depois da primeira visita).
 - **Loja:** encoste nas prateleiras para abastecê-las. Os clientes chegam com carrinho e uma lista de compras
   (até 3 produtos diferentes), passam em cada prateleira e depois vão para a fila do caixa.
 - **Colisão:** ninguém atravessa balcão, prateleiras, máquina, galinheiro ou curral; clientes e funcionários andam pelos corredores.
+- **Clientes decepcionados:** quem espera numa prateleira vazia fica 😕, depois 😟, e após uns 25 s desiste daquele
+  produto (😞 "Sem tomate"). Se não levar nada, vai embora decepcionado. Ajustes mostra quantos clientes ficaram decepcionados.
 - **Caixa:** fique no quadrado ao lado do caixa para atender; depois pegue o dinheiro que fica no balcão.
 - **Expandir:** pare em cima das placas verdes para comprar novas áreas (milho, ovos, leite, maçã, máquina de suco...).
 - **Aberto / Fechado:** a placa no canto da tela abre e fecha o mercado. Fechado, não entram clientes novos

@@ -180,6 +180,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 2px; }
       <h3>Estatísticas</h3>
       <div class="row"><span>Total ganho</span><span id="stEarned">0</span></div>
       <div class="row"><span>Clientes atendidos</span><span id="stServed">0</span></div>
+      <div class="row"><span>Clientes decepcionados</span><span id="stSad">0</span></div>
       <div class="row"><span>Áreas compradas</span><span id="stAreas">0</span></div>
       <h3>Instalar no celular</h3>
       <p class="note"><b>iPhone:</b> abra no Safari, toque em Compartilhar e depois em “Adicionar à Tela de Início”.<br>
@@ -457,6 +458,7 @@ function sfx(n) {
     case 'coin': tone(988, 0.06, 'triangle', 0.06); tone(1319, 0.16, 'triangle', 0.06, 1, 0.06); break;
     case 'pay': tone(rnd(300, 360), 0.04, 'sine', 0.04); break;
     case 'unlock': [523, 659, 784, 1047].forEach((f, i) => tone(f, 0.2, 'triangle', 0.07, 1, i * 0.09)); break;
+    case 'sad': tone(392, 0.16, 'triangle', 0.05, 0.92); tone(330, 0.28, 'triangle', 0.05, 0.85, 0.15); break;
     case 'buy': tone(660, 0.1, 'triangle', 0.07, 1.5); tone(990, 0.12, 'triangle', 0.05, 1, 0.08); break;
   }
 }
@@ -736,6 +738,9 @@ function spawnCustomer(shelves) {
     path: [{ x: DOOR_IN.x, y: DOOR_IN.y }, ...storeLeg(DOOR_IN, spotFor(list[0].sh))] };
   customers.push(c);
 }
+const PATIENCE = 25;
+// 0 = fine, 1 = a bit worried, 2 = upset (about to give up)
+const mood = c => c.pat > 16 ? 2 : c.pat > 7 ? 1 : 0;
 function nextItem(c) {
   c.li++; c.pat = 0;
   if (c.li < c.list.length) { c.state = 'in'; c.path = storeLeg(c, spotFor(c.list[c.li].sh)); }
@@ -748,12 +753,16 @@ function updCustomer(c, dt) {
   const CS = 2.3;
   if (c.state === 'in') { if (followPath(c, CS, dt)) c.state = 'shop'; }
   else if (c.state === 'shop') {
-    if (S.tut >= 5) c.pat += dt;
+    if (S.tut >= 5 && c.list[c.li].sh.stock === 0) c.pat += dt;
     c.tk -= dt; c.dir = { x: 0, y: -1 };
     const it = c.list[c.li], sh = it.sh;
     if (sh.stock > 0 && c.tk <= 0) { sh.stock--; it.have++; c.got.push(it.item); c.tk = 0.35; sh.bump = 0.6; fly(it.item, sh.x + rnd(-0.8, 0.8), sh.y, 0.6, c.x, c.y, 0.7, 0.22); }
     if (it.have >= it.want) nextItem(c);
-    else if (c.pat > 40) { it.skipped = true; nextItem(c); }
+    else if (c.pat > PATIENCE) {
+      it.skipped = true; c.sad = true; S.sad = (S.sad || 0) + 1;
+      floatText(`Sem ${P[it.item].n.toLowerCase()} 😞`, c.x, c.y, '#ffd6e5'); sfx('sad');
+      nextItem(c);
+    }
   } else if (c.state === 'queue') {
     if (c.path.length) followPath(c, CS, dt); else { const q = qslot(queue.indexOf(c)); walk(c, q.x, q.y, CS, dt); }
     if (!c.moving) c.dir = { x: 0, y: -1 };
@@ -862,6 +871,8 @@ function objective() {
       return { text: 'Pare em cima da placa para comprar a plantação de milho 🌽', p: m }; }
   }
   if (cash.amount >= 40) return { p: CASH };
+  const waiting = customers.find(c => c.state === 'shop' && mood(c) >= 1);
+  if (waiting) { const sh = waiting.list[waiting.li].sh; return { text: `Tem cliente esperando ${P[sh.item].n.toLowerCase()} 😕 Abasteça a prateleira!`, p: sh }; }
   if (player.stack.length >= bagCap() && !player.stack.some(hasRoomFor)) return { text: 'Não cabe mais nas prateleiras? Jogue o que sobrou na lixeira 🗑️', p: TRASH };
   const hungry = stations.find(s => s.unlocked && s.look === 'coop' && s.input <= 0 && s.stock === 0);
   if (hungry) return { text: 'As galinhas estão com fome! Leve milho 🌽 ao galinheiro para elas botarem ovos.', p: hungry };
@@ -1394,6 +1405,9 @@ function sync(dt) {
   for (const c of customers) {
     if (!c.pp) { c.pp = buildPerson(c.look); c.pp.g.scale.setScalar(.95); c.pp.g.rotation.y = Math.PI / 2; }
     animPerson(c, dt, true); syncCart(c, dt);
+    const upset = (c.state === 'shop' && mood(c) === 2) || (c.state === 'out' && c.angry && !c.happy);
+    c.pp.body.rotation.z = upset ? Math.sin(time * 5 + c.x) * .07 : 0;
+    c.pp.body.rotation.x = upset ? .12 : 0;
   }
   for (const h of helpers) { if (!h.pp) h.pp = buildPerson(h.look); animPerson(h, dt, h.stack.length > 0); drawStack(h, h.stack); }
   if (cashier) { if (!cashier.pp) cashier.pp = buildPerson(cashier.look); animPerson(cashier, dt, false); }
@@ -1438,11 +1452,16 @@ function drawBubble(c) {
   const a = proj(c.x, 1.55, c.y); if (a.z > 1) return;
   if (c.state === 'shop' || c.state === 'in') {
     const it = c.list[Math.min(c.li, c.list.length - 1)];
-    bubble(a.x, a.y, (x, y) => { drawE(P[it.item].e, x - U * .27, y, U * .34); txt(`${it.have}/${it.want}`, x + U * .2, y, U * .24, '#1f2a22', null, 900); }, U * 1.2);
+    const m = c.state === 'shop' ? mood(c) : 0;
+    bubble(a.x, a.y, (x, y) => {
+      const o = m ? -U * .22 : 0;
+      drawE(P[it.item].e, x - U * .27 + o, y, U * .34); txt(`${it.have}/${it.want}`, x + U * .2 + o, y, U * .24, m === 2 ? '#d9443a' : '#1f2a22', null, 900);
+      if (m) drawE(m === 2 ? '😟' : '😕', x + U * .62, y, U * .32);
+    }, U * (m ? 1.65 : 1.2));
   }
   else if (c.state === 'queue' && queue[0] === c && !staffed()) bubble(a.x, a.y, (x, y) => drawE('💲', x, y, U * .34), U * .7);
-  else if (c.state === 'out' && c.angry && !c.happy) bubble(a.x, a.y, (x, y) => drawE('😠', x, y, U * .36), U * .7);
-  else if (c.state === 'out' && c.happy && dist(c, DOOR_IN) > 0.3) bubble(a.x, a.y, (x, y) => drawE('😊', x, y, U * .36), U * .7);
+  else if (c.state === 'out' && c.angry && !c.happy) bubble(a.x, a.y, (x, y) => drawE('😞', x, y, U * .36), U * .7);
+  else if (c.state === 'out' && c.happy && dist(c, DOOR_IN) > 0.3) bubble(a.x, a.y, (x, y) => drawE(c.sad ? '😕' : '😊', x, y, U * .36), U * .7);
 }
 function moneyScreen() { const r = $('#moneyPill').getBoundingClientRect(); return { x: r.left + 20, y: r.top + r.height / 2 }; }
 function drawOverlay() {
@@ -1534,7 +1553,7 @@ $('#btnSet').addEventListener('click', () => {
   $('#optSound').checked = S.sound; $('#optVib').checked = S.vib;
   $('#stSaveWhere').textContent = cloud ? (cloudLastOk ? 'Sua conta Claude + aparelho' : 'Neste aparelho (conta: conectando…)') : 'Neste aparelho';
   const ago = Math.max(0, Math.round((Date.now() - lastSaved) / 1000)); $('#stSaveWhen').textContent = ago < 5 ? 'agora mesmo' : `há ${ago} s`;
-  $('#stEarned').textContent = '$' + fmt(S.earned); $('#stServed').textContent = fmt(S.served);
+  $('#stEarned').textContent = '$' + fmt(S.earned); $('#stServed').textContent = fmt(S.served); $('#stSad').textContent = fmt(S.sad || 0);
   $('#stAreas').textContent = `${stations.filter(s => s.unlocked).length - START.length} de ${stations.length - START.length}`;
   openSheet('#setScrim');
 });
