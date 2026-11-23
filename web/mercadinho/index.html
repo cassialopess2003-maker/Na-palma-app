@@ -970,9 +970,11 @@ $('#btnSet').addEventListener('click', () => {
 for (const sc of document.querySelectorAll('.scrim')) sc.addEventListener('click', e => { if (e.target === sc || e.target.closest('[data-close]')) { sc.hidden = true; save(); } });
 $('#optSound').addEventListener('change', e => { S.sound = e.target.checked; save(); });
 $('#optVib').addEventListener('change', e => { S.vib = e.target.checked; save(); });
-$('#btnReset').addEventListener('click', () => {
-  if (!confirm('Apagar todo o progresso e começar de novo?')) return;
-  resetting = true; try { localStorage.removeItem(KEY); } catch (e) {} location.reload();
+let resetArmed = 0;
+$('#btnReset').addEventListener('click', e => {
+  const b = e.currentTarget;
+  if (Date.now() - resetArmed > 4000) { resetArmed = Date.now(); b.textContent = 'Toque de novo para apagar tudo'; setTimeout(() => { b.textContent = 'Recomeçar do zero'; }, 4000); return; }
+  resetting = true; try { localStorage.removeItem(KEY); } catch (err) {} location.reload();
 });
 let resetting = false;
 document.addEventListener('visibilitychange', () => { if (document.hidden && !resetting) save(); });
